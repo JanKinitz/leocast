@@ -12,6 +12,7 @@ import { episodeItem } from "@/lib/podcasts";
 import { getDownloads, getProgress, isLiked, markDownloaded, toggleLike, useStoreVersion } from "@/lib/store";
 import { downloadEpisode, requestPersistentStorage } from "@/lib/offline";
 import { log } from "@/lib/diagnostics";
+import { img } from "@/lib/img";
 
 export default function Sendung() {
   useStoreVersion();
@@ -61,7 +62,7 @@ export default function Sendung() {
 
       <div className="world-hero">
         <div className="world-logo" style={{ background: source.color }}>
-          {feed?.image && <img src={feed.image} alt="" />}
+          {feed?.image && <img src={img(feed.image, 640)} alt="" />}
         </div>
         <h1 className="world-title">{feed?.title || source.name}</h1>
         <div className="world-actions">

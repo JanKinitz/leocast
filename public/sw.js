@@ -4,7 +4,7 @@
 // - Gespeicherte Podcast-Folgen: aus dem Audio-Speicher, mit Unterstützung für Spulen (Range)
 // - /api/feed: zuerst Netz, sonst letzte Antwort
 
-const VERSION = "v2";
+const VERSION = "v3";
 const APP_CACHE = `leocast-app-${VERSION}`;
 const AUDIO_CACHE = "leocast-audio-v1";
 const SHELL = ["/", "/ich", "/manifest.webmanifest", "/icons/icon-192.png", "/icons/icon-512.png"];
@@ -103,7 +103,7 @@ self.addEventListener("fetch", (event) => {
       if (cached) return cached;
       try {
         const res = await fetch(request);
-        if (res.ok && (url.pathname.startsWith("/_next/static/") || url.pathname.startsWith("/icons/"))) {
+        if (res.ok && (url.pathname.startsWith("/_next/static/") || url.pathname.startsWith("/_next/image") || url.pathname.startsWith("/icons/"))) {
           (await caches.open(APP_CACHE)).put(request, res.clone());
         }
         return res;

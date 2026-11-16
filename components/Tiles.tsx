@@ -7,6 +7,7 @@ import type { MediaItem } from "@/lib/library";
 import { getDownloads, getProgress, useStoreVersion } from "@/lib/store";
 import { usePlayer } from "./PlayerProvider";
 import { IconCheck, IconCloudCheck } from "./Icons";
+import { img } from "@/lib/img";
 
 export function Rail({ title, icon, children }: { title: string; icon?: ReactNode; children: ReactNode }) {
   return (
@@ -23,7 +24,7 @@ export function Rail({ title, icon, children }: { title: string; icon?: ReactNod
 function Cover({ image, color, label }: { image?: string; color?: string; label?: string }) {
   return (
     <div className="cover" style={{ background: color || "#2a2f55" }}>
-      {image ? <img src={image} alt="" loading="lazy" /> : <span className="cover-label">{label}</span>}
+      {image ? <img src={img(image, 384)} alt="" loading="lazy" /> : <span className="cover-label">{label}</span>}
     </div>
   );
 }

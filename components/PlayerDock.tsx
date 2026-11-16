@@ -9,6 +9,7 @@ import { isLiked, toggleLike, useStoreVersion } from "@/lib/store";
 import { usePlayer, type SleepMode } from "./PlayerProvider";
 import { PlayTile } from "./Tiles";
 import { IconBack10, IconDown, IconFwd30, IconHeart, IconMoon, IconPause, IconPlay } from "./Icons";
+import { img } from "@/lib/img";
 
 function fmt(sec: number) {
   if (!isFinite(sec) || sec < 0) sec = 0;
@@ -31,7 +32,7 @@ function MiniPlayer() {
     <div className="mini-player">
       <button className="mini-open" onClick={p.open} aria-label="Player öffnen">
         <span className="mini-cover" style={{ background: p.current.color || "#2a2f55" }}>
-          {p.current.image && <img src={p.current.image} alt="" />}
+          {p.current.image && <img src={img(p.current.image, 128)} alt="" />}
         </span>
         <span className="mini-title">{p.current.title}</span>
       </button>
@@ -63,7 +64,7 @@ function FullPlayer() {
 
       <div className="fp-main">
         <div className="fp-cover" style={{ background: item.color || "#2a2f55" }}>
-          {item.image && <img src={item.image} alt="" />}
+          {item.image && <img src={img(item.image, 640)} alt="" />}
         </div>
         <div className="fp-body">
           <h2 className="fp-title">{item.title}</h2>

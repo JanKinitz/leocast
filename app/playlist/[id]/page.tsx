@@ -11,6 +11,7 @@ import { colorFor, type MediaItem } from "@/lib/library";
 import { getPlaylistItems } from "@/lib/spotify";
 import { read, write } from "@/lib/store";
 import { log } from "@/lib/diagnostics";
+import { img } from "@/lib/img";
 
 export default function PlaylistPage() {
   const { id } = useParams<{ id: string }>();
@@ -58,7 +59,7 @@ export default function PlaylistPage() {
       </header>
       <div className="world-hero">
         <div className="world-logo square" style={{ background: color }}>
-          {pl?.images?.[0]?.url && <img src={pl.images[0].url} alt="" />}
+          {pl?.images?.[0]?.url && <img src={img(pl.images[0].url, 640)} alt="" />}
         </div>
         <h1 className="world-title">{pl?.name || ""}</h1>
       </div>

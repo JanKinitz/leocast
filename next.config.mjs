@@ -2,6 +2,11 @@
 const nextConfig = {
   reactStrictMode: true,
   devIndicators: false,
+  images: {
+    // Cover kommen von vielen Podcast-Servern und von Spotify
+    remotePatterns: [{ protocol: "https", hostname: "**" }],
+    minimumCacheTTL: 60 * 60 * 24 * 30,
+  },
   async headers() {
     return [
       {
