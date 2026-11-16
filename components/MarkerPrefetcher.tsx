@@ -10,8 +10,8 @@ import { aiPaused, getMarkers, hasMarkers, inIndex, loadMarkerIndex } from "@/li
 import { useStoreVersion } from "@/lib/store";
 import { log } from "@/lib/diagnostics";
 
-const PER_PODCAST = 10;
-const PAUSE_MS = 75_000;
+const PER_PODCAST = 5; // ältere Folgen übernimmt die Vorab-Analyse in GitHub
+const PAUSE_MS = 240_000; // kostenloses Kontingent: höchstens ca. 15 Folgen pro Stunde
 let running = false;
 let again = false;
 let generation = 0;

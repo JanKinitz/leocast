@@ -10,7 +10,8 @@ import { execSync } from "node:child_process";
 const BASE = process.env.LEOCAST_URL || "https://leocast.vercel.app";
 const OUT = process.argv[2] || "markers-out";
 const PER_PODCAST = Number(process.env.PER_PODCAST || 15);
-const PAUSE_MS = Number(process.env.PAUSE_MS || 70_000); // kostenloses Groq-Kontingent: ca. 1 Analyse pro Minute
+// Kostenloses Groq-Kontingent: max. 2 Stunden Audio pro Stunde, 7 Minuten pro Folge → höchstens 17 Folgen pro Stunde
+const PAUSE_MS = Number(process.env.PAUSE_MS || 230_000);
 const MAX_RUNTIME_MS = Number(process.env.MAX_RUNTIME_MS || 5 * 60 * 60 * 1000);
 const RETRY_ERRORS_AFTER = 7 * 24 * 3600 * 1000;
 
@@ -103,21 +104,22 @@ for (const ep of queue) {
   const q = new URLSearchParams({ v: "2", audio: ep.audioUrl, title: ep.title, show: ep.show, debug: "1", r: String(Date.now()) });
   const { ok, status, data } = await json(`${BASE}/api/analyze?${q}`);
   if (status === 429) {
-    console.log("Tageskontingent aufgebraucht – Rest beim nächsten Lauf");
+    console.log(`Kontingent aufgebraucht (${data.error || ""}) – Rest beim nächsten Lauf`);
     break;
   }
   if (ok) {
     const { segments, ...rest } = data;
     index.entries[h] = { ...rest, title: ep.title, at: Date.now() };
     if (segments) writeFileSync(join(OUT, "segments", `${h}.json`), JSON.stringify(segments));
-    console.log(`✓ ${ep.show} – ${ep.title}: Werbung bis ${data.contentStart}s, Geschichte ab ${data.storyStart}s`);
+    console.log(`✓ ${ep.show} – ${ep.title}: Werbung bis ${data.contentStart}s, Geschichte ab ${data.storyStart}s (${data.model}) ${data.reason || ""}`);
+    if (data.warnings) console.log(`  Hinweise: ${data.warnings.join(" | ")}`);
   } else {
     index.entries[h] = { error: data.error || String(status), title: ep.title, at: Date.now() };
     console.log(`✗ ${ep.show} – ${ep.title}: ${data.error || status}`);
   }
   analysed++;
   save();
-  if (analysed % 3 === 0) publish();
+  publish();
   await sleep(PAUSE_MS);
 }
 save();

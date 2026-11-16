@@ -100,7 +100,7 @@ Die Geschichte beginnt erst dort, wo erzählt wird, was in DIESER Folge passiert
 Antworte nur mit JSON: {"labels": "<ein Buchstabe pro Abschnitt, in Reihenfolge, ohne Leerzeichen>",
 "reason": "<ein kurzer Satz, woran du den Beginn der Geschichte erkennst>"}`;
 
-type Decision = { content: number; story: number | null; reason: string; labels: string; model: string };
+type Decision = { content: number; story: number | null; reason: string; labels: string; model: string; warnings: string[] };
 
 async function decide(segs: Seg[], key: string, title: string, show: string): Promise<Decision> {
   const lines = segs
@@ -156,7 +156,7 @@ async function decide(segs: Seg[], key: string, title: string, show: string): Pr
       continue;
     }
     labels = labels.slice(0, segs.length).padEnd(segs.length, labels[labels.length - 1] || "G");
-    return { ...fromLabels(labels, segs), reason: String(out.reason || "").slice(0, 200), labels, model };
+    return { ...fromLabels(labels, segs), reason: String(out.reason || "").slice(0, 200), labels, model, warnings: errors };
   }
   throw Object.assign(new Error(`Sprachmodell nicht erreichbar (${errors.join(" | ")})`), {
     status: limited === models.length ? 429 : 502,
@@ -224,6 +224,7 @@ export async function GET(request: Request) {
         firstWords: d.story != null ? segs[d.story].text.slice(0, 120) : null,
         reason: d.reason,
         model: d.model,
+        ...(d.warnings.length ? { warnings: d.warnings.map((w) => w.slice(0, 300)) } : {}),
         // Zum Nachprüfen im Elternbereich: Abschnitte mit Zeit und Einordnung
         ...(debug ? { segments: segs.map((x, i) => ({ t: Math.round(x.start), l: d.labels[i], text: x.text })) } : {}),
       },
