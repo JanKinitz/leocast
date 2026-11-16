@@ -122,7 +122,9 @@ async function decide(segs: Seg[], key: string, title: string, show: string): Pr
         { role: "user", content: user },
       ],
     };
-    if (model.startsWith("openai/gpt-oss")) body.reasoning_effort = "medium";
+    body.max_completion_tokens = 6000;
+    if (model.startsWith("openai/gpt-oss")) body.reasoning_effort = "low";
+    if (model.startsWith("qwen/")) body.reasoning_effort = "none";
     const res = await fetch(`${GROQ}/chat/completions`, {
       method: "POST",
       headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
@@ -134,19 +136,23 @@ async function decide(segs: Seg[], key: string, title: string, show: string): Pr
       continue;
     }
     const data = await res.json();
-    let out: { labels?: string; reason?: string } = {};
-    const text: string = data.choices?.[0]?.message?.content || "";
+    let out: { labels?: string | string[]; reason?: string } = {};
+    const choice = data.choices?.[0];
+    const text: string = choice?.message?.content || "";
     // JSON aus der Antwort herauslösen (manche Modelle schreiben Text oder Denkblöcke drumherum)
     const json = text.replace(/<think>[\s\S]*?<\/think>/g, "").match(/\{[\s\S]*\}/)?.[0];
     try {
       out = JSON.parse(json || "{}");
     } catch {
-      errors.push(`${model}: keine gültige Antwort`);
+      errors.push(`${model}: keine gültige Antwort (${choice?.finish_reason}) ${text.slice(0, 160)}`);
       continue;
     }
-    let labels = String(out.labels || "").toUpperCase().replace(/[^WIEGO]/g, "");
+    const raw = Array.isArray(out.labels) ? out.labels.join("") : out.labels || "";
+    let labels = String(raw).toUpperCase().replace(/[^WIEGO]/g, "");
     if (labels.length < segs.length * 0.8) {
-      errors.push(`${model}: ${labels.length} von ${segs.length} Abschnitten bewertet`);
+      errors.push(
+        `${model}: ${labels.length} von ${segs.length} Abschnitten bewertet (${choice?.finish_reason}) ${text.slice(0, 160)}`,
+      );
       continue;
     }
     labels = labels.slice(0, segs.length).padEnd(segs.length, labels[labels.length - 1] || "G");
