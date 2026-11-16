@@ -85,7 +85,7 @@ async function transcribe(audio: Uint8Array, key: string): Promise<Seg[]> {
 }
 
 // Version der Anweisung: steigt, wenn sich die Erkennung ändert (Vorab-Analyse prüft dann alles neu)
-const PROMPT_VERSION = 3;
+const PROMPT_VERSION = 4;
 
 const PROMPT = `Du bekommst den Anfang einer Kinder-Podcast-Folge (automatisch abgeschrieben) als nummerierte Abschnitte,
 dazu den Titel der Folge. Teile die Abschnitte in zusammenhängende Blöcke ein. Jeder Block hat einen Typ:
@@ -100,13 +100,16 @@ G = die eigentliche Geschichte bzw. Fantasiereise. Sie beginnt in dem Moment, in
     Bei Wissens-Sendungen: das eigentliche Thema.
 O = Abspann (Verabschiedung, Gute-Nacht-Wünsche am Ende)
 
-Beispiele (echte Folgen, von Eltern geprüft):
-- LALUNA Traumreisen: nach der Fremdwerbung kommt die Begrüßung und wer sich die Folge gewünscht hat (I), dann
-  "Hallo du kleiner Held ..." mit Hinlegen und Atmen (E). Die Geschichte (G) beginnt mit dem Satz
+Beispiele (echte Folgen, von Eltern geprüft). Die Sätze sind nur Beispiele: Jede Folge beginnt anders, achte auf
+den Inhalt, nicht auf genaue Formulierungen.
+- LALUNA Traumreisen, Folge 88: Fremdwerbung (W), Begrüßung und wer sich die Folge gewünscht hat (I), dann
+  "Hallo du kleiner Held ..." mit Hinlegen und Atmen (E). Die Geschichte (G) beginnt, als die Begleitfigur kommt:
   "Luna, die kleine Zauberkatze, kommt jetzt zu dir ...".
-- Bleib entspannt!: nach der Fremdwerbung Begrüßung/Vorspann (I), dann "Hallo du, schön dass du da bist ..." mit
-  Entspannung (E). Die Geschichte (G) beginnt mit "Stelle dir jetzt vor, du stehst an deinem Fenster ...".
-- CheckPod: nach kurzer Fremdwerbung beginnt der Podcast direkt mit dem Thema (G), ohne Entspannung.
+- Bleib entspannt!, "Noel, der Weihnachtsstern": Fremdwerbung (W), Vorspann (I), dann "Hallo du, schön dass du da
+  bist ..." mit Entspannung (E). Die Fantasiereise (G) beginnt, als ein Ort vorgestellt wird: "Stelle dir jetzt vor,
+  du stehst an deinem Fenster ...". In anderen Folgen klingt dieser Übergang anders.
+- CheckPod: keine Fremdwerbung, nur ein kurzes Intro mit Erkennungsmelodie (I), dann direkt das Thema (G).
+  Wenn es keine Fremdwerbung gibt, darf es auch keinen W-Block geben.
 
 Antworte nur mit kurzem JSON. Für jeden Block nur die Nummer des ERSTEN Abschnitts und den Typ, in Reihenfolge, z. B.:
 {"blocks":[{"from":0,"type":"W"},{"from":4,"type":"I"},{"from":11,"type":"E"},{"from":27,"type":"G"}],
@@ -195,7 +198,9 @@ function fromLabels(labels: string, segs: Seg[]): { content: number; story: numb
       break;
     }
   }
-  if (story != null && segs[story].start - segs[content].start < 20) story = null;
+  // Kurzes Intro ohne Entspannung (z. B. Erkennungsmelodie) muss nicht übersprungen werden
+  const hasRelax = story != null && labels.slice(content, story).includes("E");
+  if (story != null && segs[story].start - segs[content].start < (hasRelax ? 20 : 45)) story = null;
   return { content, story };
 }
 

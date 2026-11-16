@@ -13,7 +13,7 @@ const PER_PODCAST = Number(process.env.PER_PODCAST || 15);
 // Kostenloses Groq-Kontingent: max. 2 Stunden Audio pro Stunde, 8 Minuten pro Folge → höchstens 15 Folgen pro Stunde
 const PAUSE_MS = Number(process.env.PAUSE_MS || 245_000);
 const MAX_RUNTIME_MS = Number(process.env.MAX_RUNTIME_MS || 5 * 60 * 60 * 1000);
-const PROMPT_VERSION = 3; // wie in app/api/analyze/route.ts
+const PROMPT_VERSION = 4; // wie in app/api/analyze/route.ts
 const RETRY_ERRORS_AFTER = 7 * 24 * 3600 * 1000;
 
 const podcasts = JSON.parse(readFileSync(new URL("../lib/default-podcasts.json", import.meta.url), "utf8"));
