@@ -1,6 +1,6 @@
 // Abgleich zwischen Geräten: ein Gerät schickt seinen Stand, der Server führt ihn mit dem gespeicherten zusammen
 // und gibt das Ergebnis zurück. Gespeichert wird in Vercel Blob unter einem Pfad, der nur aus dem
-// Familien-Schlüssel berechnet werden kann. Geschrieben wird nur, wenn sich wirklich etwas geändert hat
+// festen Pfad (alle Geräte der Familie). Geschrieben wird nur, wenn sich wirklich etwas geändert hat Geschrieben wird nur, wenn sich wirklich etwas geändert hat
 // (kostenloses Kontingent: 2.000 Schreibvorgänge im Monat).
 import { createHash } from "node:crypto";
 import { head, put } from "@vercel/blob";
@@ -13,6 +13,7 @@ export const dynamic = "force-dynamic";
 const noStore = { "Cache-Control": "no-store" };
 const MAX_BYTES = 900_000;
 
+const FAMILY_PATH = "sync/familie.json";
 const pathFor = (code: string) => `sync/${createHash("sha256").update(`leocast:${code}`).digest("hex")}.json`;
 
 const LIST_PATH = "config/analyse-list.json";
@@ -49,17 +50,19 @@ export async function POST(request: Request) {
 
   const raw = await request.text();
   if (raw.length > MAX_BYTES) return Response.json({ error: "zu groß" }, { status: 413, headers: noStore });
-  let body: { code?: string; state?: SyncState };
+  let body: { code?: string; auto?: boolean; state?: SyncState };
   try {
     body = JSON.parse(raw);
   } catch {
     return Response.json({ error: "ungültig" }, { status: 400, headers: noStore });
   }
-  const code = normalizeCode(body.code || "");
-  if (!code) return Response.json({ error: "Familien-Schlüssel ungültig" }, { status: 400, headers: noStore });
+  // Standard: alle Geräte gehören automatisch zur Familie (private App, keine vertraulichen Daten).
+  // Ein Familien-Schlüssel (frühere Version) wird nur noch einmalig zum Übernehmen alter Daten gelesen.
+  const code = body.auto ? null : normalizeCode(body.code || "");
+  if (!body.auto && !code) return Response.json({ error: "Familien-Schlüssel ungültig" }, { status: 400, headers: noStore });
   const incoming = body.state && body.state.v === 1 ? body.state : emptyState();
 
-  const path = pathFor(code);
+  const path = code ? pathFor(code) : FAMILY_PATH;
   const stored = await load(path);
   const merged = mergeStates(stored, incoming);
   let wrote = false;

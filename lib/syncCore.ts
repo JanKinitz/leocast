@@ -10,6 +10,8 @@ export type DeviceInfo = {
   at: number;
   /** offline gespeicherte Folgen auf diesem Gerät */
   downloads: Record<string, { title: string; podcastId?: string; image?: string }>;
+  /** Auf diesem Gerät mit Spotify angemeldet? (nur ja/nein – Zugangsdaten bleiben auf dem Gerät) */
+  spotify?: boolean;
 };
 
 export type SyncState = {

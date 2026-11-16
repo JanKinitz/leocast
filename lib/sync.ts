@@ -1,11 +1,11 @@
 "use client";
 
-// Abgleich zwischen Handy und Tablet (Familien-Schlüssel, Server: /api/sync).
+// Abgleich zwischen Handy und Tablet (automatisch, Server: /api/sync).
 // Abgeglichen werden: Mag ich, Fortschritt, selbst hinzugefügte/ausgeblendete Podcasts, Reihen-Zuordnung,
 // Einstellungen „Sprungmarken mit KI“, „Vorspann“ und „Start“, von Eltern korrigierte Sprungmarken.
 // Pro Gerät: Name und welche Folgen dort offline gespeichert sind.
 import { getDownloads, read, setWriteHook, writeRaw } from "./store";
-import { CODE_ALPHABET, emptyState, normalizeCode, type DeviceInfo, type Stamped, type SyncState } from "./syncCore";
+import { emptyState, type DeviceInfo, type Stamped, type SyncState } from "./syncCore";
 import { log } from "./diagnostics";
 
 const MAP_KEYS = ["leocast:likes", "leocast:progress", "leocast:podcast-category"];
@@ -74,26 +74,6 @@ export function getFamilyCode(): string | null {
   return read<string | null>(CODE, null);
 }
 
-export function setFamilyCode(input: string | null): boolean {
-  if (input === null) {
-    writeRaw(CODE, null);
-    return true;
-  }
-  const code = normalizeCode(input);
-  if (!code) return false;
-  writeRaw(CODE, code);
-  return true;
-}
-
-export function newFamilyCode(): string {
-  const bytes = crypto.getRandomValues(new Uint8Array(16));
-  return [...bytes]
-    .map((b) => CODE_ALPHABET[b % CODE_ALPHABET.length])
-    .join("")
-    .match(/.{4}/g)!
-    .join("-");
-}
-
 type Device = { id: string; name: string; changed: number };
 
 export function getDevice(): Device {
@@ -148,10 +128,11 @@ function buildState(): SyncState {
       { title: d.item.title, podcastId: d.item.podcastId, image: d.item.image },
     ]),
   );
-  const own: DeviceInfo = { name: device.name, at: device.changed, downloads };
+  const spotify = Boolean(read<unknown>("leocast:spotify-token", null));
+  const own: DeviceInfo = { name: device.name, at: device.changed, downloads, spotify };
   // Downloads geändert? Dann zählt das als Änderung am Gerät
   const last = read<string>("leocast:sync-downloads", "");
-  const sig = JSON.stringify(Object.keys(downloads).sort()) + device.name;
+  const sig = JSON.stringify(Object.keys(downloads).sort()) + device.name + spotify;
   if (sig !== last) {
     own.at = Date.now();
     writeRaw(DEVICE, { ...device, changed: own.at });
@@ -190,25 +171,39 @@ function applyState(remote: SyncState) {
 // ---- Abgleich ausführen ----
 let running: Promise<void> | null = null;
 
+async function post(payload: Record<string, unknown>) {
+  const res = await fetch("/api/sync", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ...payload, state: buildState() }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || res.status);
+  return data as { state: SyncState; wrote: boolean };
+}
+
 export function syncNow(reason = ""): Promise<void> {
-  const code = getFamilyCode();
-  if (!code || typeof navigator === "undefined" || !navigator.onLine) return Promise.resolve();
+  if (typeof navigator === "undefined" || !navigator.onLine) return Promise.resolve();
   if (running) return running;
   running = (async () => {
     try {
-      const res = await fetch("/api/sync", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code, state: buildState() }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || res.status);
-      const changed = applyState(data.state as SyncState);
+      // Frühere Version mit Familien-Schlüssel: alte Daten einmal holen, dann automatisch weiter
+      const oldCode = getFamilyCode();
+      if (oldCode) {
+        try {
+          applyState((await post({ code: oldCode })).state);
+        } catch {
+          /* alter Stand nicht erreichbar – egal */
+        }
+        writeRaw(CODE, null);
+      }
+      const data = await post({ auto: true });
+      const changed = applyState(data.state);
       writeRaw(STATUS, {
         at: Date.now(),
         ok: true,
         message: changed ? "Neues vom anderen Gerät übernommen" : "Alles auf dem gleichen Stand",
-        devices: (data.state as SyncState).devices,
+        devices: data.state.devices,
       } satisfies SyncStatus);
       if (changed || data.wrote) log("ok", `Abgleich${reason ? ` (${reason})` : ""}: ${changed ? "übernommen" : "gesendet"}`);
     } catch (e) {
