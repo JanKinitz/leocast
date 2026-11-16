@@ -7,6 +7,8 @@ import { playableSrc } from "@/lib/offline";
 import { getProgress, saveProgress } from "@/lib/store";
 import { loadToken } from "@/lib/spotify";
 import { log } from "@/lib/diagnostics";
+import { podcastById } from "@/lib/library";
+import { storyStart } from "@/lib/markers";
 import { useSpotifyPlayer, type SdkState } from "./useSpotifyPlayer";
 
 export type SleepMode = "end" | 15 | 30 | 45;
@@ -30,6 +32,9 @@ type PlayerCtx = {
   spotifyReady: boolean;
   spotifyError: string | null;
   error: string | null;
+  /** Absolute Stelle, an der die eigentliche Geschichte beginnt (oder null) */
+  storyAt: number | null;
+  skipToStory: () => void;
 };
 
 const Ctx = createContext<PlayerCtx | null>(null);
@@ -61,6 +66,7 @@ export default function PlayerProvider({ children }: { children: React.ReactNode
   const [sleepEndsAt, setSleepEndsAt] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [spotifyEnabled, setSpotifyEnabled] = useState(false);
+  const [storyAt, setStoryAt] = useState<number | null>(null);
 
   useEffect(() => {
     setSpotifyEnabled(!!loadToken());
@@ -184,18 +190,33 @@ export default function PlayerProvider({ children }: { children: React.ReactNode
           const { src } = await playableSrc(item.audioUrl);
           a.src = src;
           const saved = getProgress(item.id);
-          if (saved && !saved.finished && saved.pos > 5) {
-            a.addEventListener(
-              "loadedmetadata",
-              () => {
-                a.currentTime = Math.max(0, saved.pos - 3);
-              },
-              { once: true },
-            );
-          }
+          const source = item.podcastId ? podcastById(item.podcastId) : undefined;
+          setStoryAt(null);
+          const story = storyStart(item);
+          a.addEventListener(
+            "loadedmetadata",
+            async () => {
+              // Eingefügte Werbung vorne = tatsächliche Länge minus Länge laut Feed
+              const extra = item.durationSec && isFinite(a.duration) ? a.duration - item.durationSec : 0;
+              const adOffset = extra > 5 && extra < 240 ? extra : 0;
+              if (saved && !saved.finished && saved.pos > 5) {
+                a.currentTime = Math.max(adOffset, saved.pos - 3);
+              } else if (adOffset && source?.skipAds) {
+                a.currentTime = adOffset;
+                log("ok", `Werbung übersprungen (${Math.round(adOffset)} s)`);
+              }
+              const s = await story;
+              if (currentRef.current?.id === item.id && s) {
+                setStoryAt(adOffset + s.sec);
+                log("info", `Geschichte beginnt bei ${Math.round(adOffset + s.sec)} s (${s.source})`);
+              }
+            },
+            { once: true },
+          );
           await a.play();
           saveProgress(item, saved && !saved.finished ? saved.pos : 0, item.durationSec || 0);
         } else if (item.kind === "track" && item.uri) {
+          setStoryAt(null);
           audioRef.current?.pause();
           engineRef.current = "spotify";
           await spotifyRef.current.play(item.uri);
@@ -231,6 +252,13 @@ export default function PlayerProvider({ children }: { children: React.ReactNode
   );
 
   const seekBy = useCallback((sec: number) => seekTo(positionRef.current + sec), [seekTo]);
+
+  const skipToStory = useCallback(() => {
+    if (storyAt != null) {
+      seekTo(storyAt);
+      log("info", "Zur Geschichte gesprungen");
+    }
+  }, [storyAt, seekTo]);
 
   // Schlaf-Timer: nach X Minuten langsam leiser werden und anhalten
   const setSleep = useCallback((m: SleepMode) => {
@@ -292,8 +320,10 @@ export default function PlayerProvider({ children }: { children: React.ReactNode
       spotifyReady: spotifyHook.ready,
       spotifyError: spotifyHook.error,
       error,
+      storyAt,
+      skipToStory,
     }),
-    [current, more, playing, position, duration, expanded, open, close, play, toggle, seekBy, seekTo, sleep, setSleep, sleepEndsAt, spotifyHook.ready, spotifyHook.error, error],
+    [current, more, playing, position, duration, expanded, open, close, play, toggle, seekBy, seekTo, sleep, setSleep, sleepEndsAt, spotifyHook.ready, spotifyHook.error, error, storyAt, skipToStory],
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

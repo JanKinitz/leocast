@@ -94,3 +94,11 @@ export const IconCheck = ({ size = 18 }: P) => (
     <path d="M5 12l5 5 9-10" />
   </svg>
 );
+
+export const IconSkip = ({ size = 26 }: P) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+    <path d="M5 5v14l8-7z" />
+    <path d="M12 5v14l8-7z" />
+    <rect x="19" y="5" width="2.4" height="14" rx="1" />
+  </svg>
+);

@@ -8,6 +8,69 @@ import { usePlayer } from "@/components/PlayerProvider";
 import { getMe, loadToken, logout, startLogin } from "@/lib/spotify";
 import { storageEstimate } from "@/lib/offline";
 import { getDownloads, useStoreVersion } from "@/lib/store";
+import { PODCASTS } from "@/lib/library";
+import { getManualIntro, setManualIntro } from "@/lib/markers";
+
+function fmtMinSec(sec: number | null) {
+  if (!sec) return "";
+  return `${Math.floor(sec / 60)}:${String(Math.round(sec % 60)).padStart(2, "0")}`;
+}
+
+function parseMinSec(v: string): number | null {
+  const t = v.trim();
+  if (!t) return null;
+  const m = /^(\d{1,2})(?::(\d{1,2}))?$/.exec(t);
+  if (!m) return NaN;
+  return Number(m[1]) * 60 + Number(m[2] || 0);
+}
+
+function IntroSettings() {
+  useStoreVersion();
+  const [drafts, setDrafts] = useState<Record<string, string>>({});
+  const [saved, setSaved] = useState<string | null>(null);
+  return (
+    <section className="card">
+      <h2>Vorspann überspringen</h2>
+      <p className="hint">
+        Bei LALUNA findet Leocast den Beginn der Geschichte selbst (aus dem Transkript). Für andere Podcasts kannst du hier
+        einstellen, nach wie vielen Minuten die Geschichte ungefähr beginnt. Dann erscheint im Player der Knopf „Zur Geschichte“.
+      </p>
+      <ul className="intro-list">
+        {PODCASTS.map((p) => {
+          const current = getManualIntro(p.id);
+          const value = drafts[p.id] ?? fmtMinSec(current);
+          return (
+            <li key={p.id}>
+              <label htmlFor={`intro-${p.id}`}>{p.name}</label>
+              <input
+                id={`intro-${p.id}`}
+                inputMode="numeric"
+                placeholder="z. B. 3:30"
+                value={value}
+                onChange={(e) => setDrafts({ ...drafts, [p.id]: e.target.value })}
+              />
+              <button
+                className="secondary"
+                onClick={() => {
+                  const sec = parseMinSec(value);
+                  if (sec !== null && Number.isNaN(sec)) {
+                    setSaved(`${p.name}: bitte als Minuten:Sekunden eingeben, z. B. 3:30`);
+                    return;
+                  }
+                  setManualIntro(p.id, sec);
+                  setSaved(sec ? `${p.name}: Geschichte ab ${fmtMinSec(sec)}` : `${p.name}: kein Vorspann eingestellt`);
+                }}
+              >
+                Speichern
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+      {saved && <p className="hint">{saved}</p>}
+    </section>
+  );
+}
 
 function Gate({ onOpen }: { onOpen: () => void }) {
   const task = useMemo(() => {
@@ -110,6 +173,8 @@ export default function Eltern() {
         </p>
         <p className="hint">Folgen speicherst du in einer Sendung über „Für unterwegs speichern“.</p>
       </section>
+
+      <IntroSettings />
 
       <section className="card">
         <h2>Prüfprotokoll</h2>

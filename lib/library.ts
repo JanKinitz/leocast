@@ -14,6 +14,10 @@ export type MediaItem = {
   durationSec?: number;
   /** Podcast-Folge: Adresse der Audiodatei */
   audioUrl?: string;
+  /** Podcast-Folge: Transkript/Kapitel für die Sprungmarke „Zur Geschichte“ */
+  transcriptUrl?: string;
+  transcriptType?: string;
+  chaptersUrl?: string;
   /** Spotify-Titel: spotify:track:… */
   uri?: string;
   podcastId?: string;
@@ -26,8 +30,12 @@ export type PodcastSource = {
   /** Suchbegriff für das Podcast-Verzeichnis, falls keine Feed-Adresse bekannt ist */
   search: string;
   feedUrl?: string;
-  /** Nur Folgen zeigen, deren Titel dieses Wort enthält */
-  titleFilter?: string;
+  /** Zusätzlich ausblenden, wenn der Titel passt (z. B. Folgen nur für Erwachsene) */
+  hideTitle?: RegExp;
+  /** Werbung vor der Folge automatisch überspringen */
+  skipAds?: boolean;
+  /** Zusätzliche Wörter, die zum Vorspann gehören (für die Transkript-Erkennung) */
+  introWords?: string;
   color: string;
   category: "podcasts" | "gutenacht";
 };
@@ -59,6 +67,8 @@ export const PODCASTS: PodcastSource[] = [
     id: "laluna",
     name: "LALUNA Traumreisen",
     search: "LALUNA Traumreisen",
+    feedUrl: "https://cdn.audiorella.com/podcasts/1786-laluna-traumreisen-zum-einschlafen/feed.rss",
+    skipAds: true,
     color: "#43479a",
     category: "gutenacht",
   },
@@ -68,7 +78,9 @@ export const PODCASTS: PodcastSource[] = [
     search: "Bleib entspannt Meditations-Podcast",
     feedUrl:
       "https://cdn.audiorella.com/podcasts/1760-bleib-entspannt-der-meditations-podcast-magische-momente-fur-kinder-eltern/feed.rss",
-    titleFilter: "Kinder",
+    // Folgen nur für Erwachsene ausblenden („für Erwachsene & Kinder“ bleibt)
+    hideTitle: /^(?!.*kinder).*erwachsene/i,
+    skipAds: true,
     color: "#2d6177",
     category: "gutenacht",
   },

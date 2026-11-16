@@ -12,11 +12,15 @@ export type Episode = {
   image?: string;
   durationSec?: number;
   published?: string;
+  episodeType?: string;
+  transcriptUrl?: string;
+  transcriptType?: string;
+  chaptersUrl?: string;
 };
 
 export type Feed = { title: string; image?: string; episodes: Episode[]; loadedAt: number };
 
-const feedKey = (id: string) => `leocast:feed:${id}`;
+const feedKey = (id: string) => `leocast:feed2:${id}`;
 const feedUrlKey = (id: string) => `leocast:feedurl:${id}`;
 
 export function cachedFeed(id: string): Feed | null {
@@ -72,11 +76,14 @@ export function loadFeed(source: PodcastSource, maxAgeMs = 30 * 60 * 1000): Prom
         image: e.image || data.image,
         durationSec: e.durationSec,
         published: e.published,
+        episodeType: e.episodeType,
+        transcriptUrl: e.transcriptUrl,
+        transcriptType: e.transcriptType,
+        chaptersUrl: e.chaptersUrl,
       }));
-      if (source.titleFilter) {
-        const f = source.titleFilter.toLowerCase();
-        episodes = episodes.filter((e) => e.title.toLowerCase().includes(f));
-      }
+      const before = episodes.length;
+      episodes = episodes.filter((e) => isRealContent(e) && !(source.hideTitle && source.hideTitle.test(e.title)));
+      if (before !== episodes.length) log("info", `„${source.name}“: ${before - episodes.length} Folgen ohne echten Inhalt ausgeblendet`);
       const feed: Feed = { title: data.title, image: data.image, episodes: episodes.slice(0, 60), loadedAt: Date.now() };
       write(feedKey(source.id), feed);
       return feed;
@@ -92,6 +99,17 @@ export function loadFeed(source: PodcastSource, maxAgeMs = 30 * 60 * 1000): Prom
   return p;
 }
 
+// Ankündigungen, Pausen-Hinweise, Trailer und sehr kurze Folgen sind keine echten Inhalte
+const NOT_CONTENT = /\b(ankündigung|trailer|teaser|vorschau|pause|sommerpause|winterpause|in eigener sache|hinweis|neuigkeiten|news|update|bonus-?info)\b/i;
+
+export function isRealContent(e: Episode): boolean {
+  if (e.episodeType === "trailer" || e.episodeType === "bonus") return false;
+  const dur = e.durationSec || 0;
+  if (dur > 0 && dur < 240) return false;
+  if (NOT_CONTENT.test(e.title) && (dur === 0 || dur < 600)) return false;
+  return true;
+}
+
 export function episodeItem(ep: Episode, source: PodcastSource): MediaItem {
   return {
     kind: "episode",
@@ -102,6 +120,9 @@ export function episodeItem(ep: Episode, source: PodcastSource): MediaItem {
     color: source.color,
     durationSec: ep.durationSec,
     audioUrl: ep.audioUrl,
+    transcriptUrl: ep.transcriptUrl,
+    transcriptType: ep.transcriptType,
+    chaptersUrl: ep.chaptersUrl,
     podcastId: source.id,
   };
 }

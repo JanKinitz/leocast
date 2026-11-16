@@ -15,6 +15,10 @@ type Episode = {
   durationSec?: number;
   image?: string;
   description?: string;
+  episodeType?: string;
+  transcriptUrl?: string;
+  transcriptType?: string;
+  chaptersUrl?: string;
 };
 
 function text(v: unknown): string {
@@ -39,6 +43,16 @@ function parseDuration(v: unknown): number | undefined {
 function asArray<T>(v: T | T[] | undefined): T[] {
   if (v == null) return [];
   return Array.isArray(v) ? v : [v];
+}
+
+// Transkript mit Zeitangaben bevorzugen: VTT, dann SRT, dann HTML (Text ohne Zeiten nützt nichts)
+function pickTranscript(item: any): { transcriptUrl?: string; transcriptType?: string } {
+  const list = asArray<any>(item["podcast:transcript"]);
+  for (const type of ["text/vtt", "application/x-subrip", "application/srt", "text/html"]) {
+    const t = list.find((x) => x?.["@_type"] === type);
+    if (t?.["@_url"]) return { transcriptUrl: t["@_url"], transcriptType: type };
+  }
+  return {};
 }
 
 export async function GET(request: Request) {
@@ -91,6 +105,9 @@ export async function GET(request: Request) {
         durationSec: parseDuration(item["itunes:duration"]),
         image: item["itunes:image"]?.["@_href"] || channelImage,
         description: text(item["itunes:summary"] || item.description).slice(0, 500),
+        episodeType: text(item["itunes:episodeType"]) || undefined,
+        ...pickTranscript(item),
+        chaptersUrl: asArray<any>(item["podcast:chapters"])[0]?.["@_url"],
       };
     })
     .filter((e): e is Episode => !!e);

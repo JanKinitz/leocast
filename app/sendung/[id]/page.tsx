@@ -12,6 +12,7 @@ import { episodeItem } from "@/lib/podcasts";
 import { getDownloads, getProgress, isLiked, markDownloaded, toggleLike, useStoreVersion } from "@/lib/store";
 import { downloadEpisode, requestPersistentStorage } from "@/lib/offline";
 import { log } from "@/lib/diagnostics";
+import { prefetchMarkers } from "@/lib/markers";
 import { img } from "@/lib/img";
 
 export default function Sendung() {
@@ -45,7 +46,10 @@ export default function Sendung() {
     for (const it of notSaved) {
       setSaving(it.id);
       const { result, detail } = await downloadEpisode(it.audioUrl!);
-      if (result !== "failed") markDownloaded(it, result);
+      if (result !== "failed") {
+        markDownloaded(it, result);
+        prefetchMarkers(it);
+      }
       log(result === "failed" ? "error" : "ok", `Offline „${it.title}“: ${result} – ${detail}`);
     }
     setSaving(null);

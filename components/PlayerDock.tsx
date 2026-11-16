@@ -8,7 +8,7 @@ import { useState } from "react";
 import { isLiked, toggleLike, useStoreVersion } from "@/lib/store";
 import { usePlayer, type SleepMode } from "./PlayerProvider";
 import { PlayTile } from "./Tiles";
-import { IconBack10, IconDown, IconFwd30, IconHeart, IconMoon, IconPause, IconPlay } from "./Icons";
+import { IconBack10, IconDown, IconFwd30, IconHeart, IconMoon, IconPause, IconPlay, IconSkip } from "./Icons";
 import { img } from "@/lib/img";
 
 function fmt(sec: number) {
@@ -99,6 +99,13 @@ function FullPlayer() {
               <span className="btn-mini-label">30</span>
             </button>
           </div>
+
+          {p.storyAt != null && p.position < p.storyAt - 5 && (
+            <button className="story-btn" onClick={p.skipToStory}>
+              <IconSkip />
+              Zur Geschichte
+            </button>
+          )}
 
           {p.error && <div className="fp-error">{p.error}</div>}
 
