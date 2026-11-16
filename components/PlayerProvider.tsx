@@ -8,7 +8,7 @@ import { getProgress, saveProgress } from "@/lib/store";
 import { loadToken } from "@/lib/spotify";
 import { log } from "@/lib/diagnostics";
 import { podcastById } from "@/lib/library";
-import { storyStart } from "@/lib/markers";
+import { getAutoStory, getMarkers } from "@/lib/markers";
 import { useSpotifyPlayer, type SdkState } from "./useSpotifyPlayer";
 
 export type SleepMode = "end" | 15 | 30 | 45;
@@ -192,23 +192,39 @@ export default function PlayerProvider({ children }: { children: React.ReactNode
           const saved = getProgress(item.id);
           const source = item.podcastId ? podcastById(item.podcastId) : undefined;
           setStoryAt(null);
-          const story = storyStart(item);
+          const markers = getMarkers(item);
+          const resumed = Boolean(saved && !saved.finished && saved.pos > 5);
           a.addEventListener(
             "loadedmetadata",
             async () => {
-              // Eingefügte Werbung vorne = tatsächliche Länge minus Länge laut Feed
-              const extra = item.durationSec && isFinite(a.duration) ? a.duration - item.durationSec : 0;
-              const adOffset = extra > 5 && extra < 240 ? extra : 0;
-              if (saved && !saved.finished && saved.pos > 5) {
-                a.currentTime = Math.max(adOffset, saved.pos - 3);
-              } else if (adOffset && source?.skipAds) {
-                a.currentTime = adOffset;
-                log("ok", `Werbung übersprungen (${Math.round(adOffset)} s)`);
+              const dur = isFinite(a.duration) ? a.duration : 0;
+              // Ersatz ohne KI: eingefügte Werbung = tatsächliche Länge minus Länge laut Feed
+              const extra = item.durationSec && dur ? dur - item.durationSec : 0;
+              const feedOffset = extra > 5 && extra < 240 ? extra : 0;
+              if (resumed && saved) a.currentTime = Math.max(0, saved.pos - 3);
+
+              const m = await markers;
+              if (currentRef.current?.id !== item.id) return;
+              let shift = 0;
+              if (m?.absolute && m.totalSec && dur) {
+                // Auf diesem Gerät kann die Werbung anders lang sein als bei der Analyse
+                const d = dur - m.totalSec;
+                shift = Math.abs(d) > 2 && Math.abs(d) < 240 ? d : 0;
+              } else if (m && !m.absolute) {
+                shift = feedOffset;
               }
-              const s = await story;
-              if (currentRef.current?.id === item.id && s) {
-                setStoryAt(adOffset + s.sec);
-                log("info", `Geschichte beginnt bei ${Math.round(adOffset + s.sec)} s (${s.source})`);
+              const adEnd = m?.source === "ki" ? m.content + shift : feedOffset;
+              const story = m?.story != null ? m.story + shift : null;
+              setStoryAt(story);
+              if (story != null) log("info", `Geschichte beginnt bei ${Math.round(story)} s (${m?.source})`);
+              if (resumed) return;
+              const pos = a.currentTime;
+              if (story != null && item.podcastId && getAutoStory(item.podcastId) && pos < story - 5) {
+                a.currentTime = story;
+                log("ok", "Automatisch zur Geschichte gesprungen");
+              } else if (adEnd > 3 && source?.skipAds !== false && pos < adEnd - 2) {
+                a.currentTime = adEnd;
+                log("ok", `Werbung übersprungen (${Math.round(adEnd)} s)`);
               }
             },
             { once: true },

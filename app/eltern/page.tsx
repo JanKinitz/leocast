@@ -9,7 +9,7 @@ import { getMe, loadToken, logout, startLogin } from "@/lib/spotify";
 import { storageEstimate } from "@/lib/offline";
 import { getDownloads, useStoreVersion } from "@/lib/store";
 import { PODCASTS } from "@/lib/library";
-import { getManualIntro, setManualIntro } from "@/lib/markers";
+import { aiConfigured, getAutoStory, getManualIntro, setAutoStory, setManualIntro } from "@/lib/markers";
 
 function fmtMinSec(sec: number | null) {
   if (!sec) return "";
@@ -28,12 +28,23 @@ function IntroSettings() {
   useStoreVersion();
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [saved, setSaved] = useState<string | null>(null);
+  const [ai, setAi] = useState<boolean | null>(null);
+  useEffect(() => {
+    aiConfigured().then(setAi);
+  }, []);
   return (
     <section className="card">
-      <h2>Vorspann überspringen</h2>
+      <h2>Werbung und Vorspann überspringen</h2>
       <p className="hint">
-        Bei LALUNA findet Leocast den Beginn der Geschichte selbst (aus dem Transkript). Für andere Podcasts kannst du hier
-        einstellen, nach wie vielen Minuten die Geschichte ungefähr beginnt. Dann erscheint im Player der Knopf „Zur Geschichte“.
+        {ai === null
+          ? "Prüfe KI-Analyse …"
+          : ai
+            ? "KI-Analyse ist eingerichtet: Leocast hört sich den Anfang jeder Folge an und findet Werbung und den Beginn der Geschichte selbst."
+            : "KI-Analyse ist noch nicht eingerichtet (GROQ_API_KEY fehlt bei Vercel). Bis dahin nutzt Leocast Transkripte, wo es sie gibt."}
+      </p>
+      <p className="hint">
+        „Automatisch“ springt beim Start direkt zur Geschichte. Sonst erscheint im Player der Knopf „Zur Geschichte“. Die Minuten
+        brauchst du nur, wenn die Analyse bei einem Podcast nicht klappt.
       </p>
       <ul className="intro-list">
         {PODCASTS.map((p) => {
@@ -49,6 +60,14 @@ function IntroSettings() {
                 value={value}
                 onChange={(e) => setDrafts({ ...drafts, [p.id]: e.target.value })}
               />
+              <label className="auto-toggle">
+                <input
+                  type="checkbox"
+                  checked={getAutoStory(p.id)}
+                  onChange={(e) => setAutoStory(p.id, e.target.checked)}
+                />
+                Automatisch
+              </label>
               <button
                 className="secondary"
                 onClick={() => {

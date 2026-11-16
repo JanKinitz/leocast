@@ -3,7 +3,7 @@
 // Sendungs-Welt: eigene Farbe, großes rundes Logo, Folgen als wischbare Reihen.
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { PlayTile, Rail } from "@/components/Tiles";
 import { useFeed, useOnline } from "@/components/hooks";
 import { IconBack, IconCloudDown, IconHeart } from "@/components/Icons";
@@ -22,6 +22,12 @@ export default function Sendung() {
   const { feed, error } = useFeed(source);
   const online = useOnline();
   const [saving, setSaving] = useState<string | null>(null);
+
+  // Die drei neuesten Folgen vorab analysieren, damit Sprungmarken beim Abspielen schon bereitstehen
+  useEffect(() => {
+    if (!feed || !source || !online) return;
+    feed.episodes.slice(0, 3).forEach((ep) => prefetchMarkers(episodeItem(ep, source)));
+  }, [feed, source, online]);
 
   if (!source) {
     return (
