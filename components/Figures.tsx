@@ -3,7 +3,8 @@
 // Kleine Figuren zwischen den Kacheln (wie in der KiKA-App, aber eigene Figuren):
 // antippen → Geräusch + Bewegung. Jede Woche wechseln sie von selbst; zu besonderen Zeiten
 // (Halloween, Nikolaus, Weihnachten, Silvester, Fasching, Ostern …) kommt eine passende Figur.
-import { useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import type { FigureScene } from "@/lib/figures3d";
 import { playSound, type SoundName } from "@/lib/sounds";
 
 type Anim = "bounce" | "wobble" | "spin" | "float" | "hop" | "twinkle" | "launch" | "buzz" | "wave" | "roll";
@@ -252,22 +253,6 @@ export const FIGURES: Figure[] = [
       </>
     ),
   },
-  {
-    id: "drache",
-    name: "Windi",
-    season: [915, 1031],
-    anim: "float",
-    sound: "whoosh",
-    art: (
-      <>
-        <path d="M60 6 L96 46 L60 96 L24 46z" fill="#22c55e" />
-        <path d="M60 6 L60 96 M24 46 L96 46" stroke="#15803d" strokeWidth="3" />
-        <Eyes y={40} r={5} dx={10} />
-        <Smile y={54} w={8} />
-        <path d="M60 96 Q50 106 62 110 Q74 114 64 120" stroke="#f97316" strokeWidth="3" fill="none" />
-      </>
-    ),
-  },
 
   // ---- das ganze Jahr ----
   {
@@ -401,21 +386,67 @@ export function figuresOfTheWeek(date = new Date()): Figure[] {
 }
 
 export function FigureTile({ figure }: { figure: Figure }) {
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const sceneRef = useRef<FigureScene | null>(null);
+  const [ready, setReady] = useState(false);
   const [active, setActive] = useState(0);
+
+  // 3D-Figur erst laden, wenn sie sichtbar wird; nur animieren, solange sie zu sehen ist
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || typeof IntersectionObserver === "undefined") return;
+    let disposed = false;
+    const io = new IntersectionObserver(
+      async ([entry]) => {
+        if (entry.isIntersecting) {
+          if (!sceneRef.current) {
+            try {
+              const { createFigureScene } = await import("@/lib/figures3d");
+              if (disposed) return;
+              sceneRef.current = await createFigureScene(canvas, figure.id, figure.anim);
+              setReady(true);
+            } catch {
+              return; // kein WebGL: gezeichnete Figur bleibt
+            }
+          }
+          if (document.visibilityState === "visible") sceneRef.current?.start();
+        } else {
+          sceneRef.current?.stop();
+        }
+      },
+      { threshold: 0.1 },
+    );
+    io.observe(canvas);
+    const onVis = () => (document.visibilityState === "visible" ? null : sceneRef.current?.stop());
+    document.addEventListener("visibilitychange", onVis);
+    return () => {
+      disposed = true;
+      io.disconnect();
+      document.removeEventListener("visibilitychange", onVis);
+      sceneRef.current?.dispose();
+      sceneRef.current = null;
+    };
+  }, [figure.id, figure.anim]);
+
   return (
     <button
-      className={`figure-tile anim-${figure.anim} ${active ? "active" : ""}`}
-      key={active}
+      className={`figure-tile anim-${figure.anim} ${active && !ready ? "active" : ""} ${ready ? "is-3d" : ""}`}
       onClick={() => {
         playSound(figure.sound);
-        setActive((n) => n + 1);
+        if (sceneRef.current) sceneRef.current.tap();
+        else setActive((n) => n + 1);
       }}
       onAnimationEnd={() => setActive(0)}
       aria-label={`${figure.name} antippen`}
     >
-      <svg viewBox="0 0 120 120" className="figure-art" aria-hidden="true">
-        {figure.art}
-      </svg>
+      <span className="figure-stage">
+        <canvas ref={canvasRef} className="figure-canvas" width={130} height={130} />
+        {!ready && (
+          <svg viewBox="0 0 120 120" className="figure-art" aria-hidden="true" key={active}>
+            {figure.art}
+          </svg>
+        )}
+      </span>
       <span className="figure-name">{figure.name}</span>
     </button>
   );

@@ -1686,3 +1686,34 @@ h3 {
 @media (prefers-reduced-motion: reduce) {
   .figure-art { animation: none !important; }
 }
+
+/* 3D-Figuren: Leinwand und gezeichnete Ersatzfigur liegen übereinander */
+.figure-stage {
+  position: relative;
+  width: 130px;
+  height: 130px;
+  display: block;
+}
+
+.figure-canvas {
+  position: absolute;
+  inset: -10px;
+  width: 150px;
+  height: 150px;
+}
+
+.figure-stage .figure-art {
+  position: absolute;
+  inset: 10px;
+}
+
+.figure-tile {
+  width: 150px;
+}
+
+.figure-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px 16px;
+}
