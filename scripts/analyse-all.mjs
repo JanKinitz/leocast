@@ -51,6 +51,8 @@ async function feedUrlFor(p) {
 }
 
 mkdirSync(join(OUT, "segments"), { recursive: true });
+// Der Zweig enthält nur Daten: Vercel soll ihn nicht als App veröffentlichen (sonst Fehler-Mails)
+writeFileSync(join(OUT, "vercel.json"), JSON.stringify({ git: { deploymentEnabled: false } }, null, 2));
 const indexFile = join(OUT, "index.json");
 const index = existsSync(indexFile) ? JSON.parse(readFileSync(indexFile, "utf8")) : { entries: {} };
 // Regel „nur mit Entspannung springen“ auch auf ältere Ergebnisse anwenden (aus den gespeicherten Abschnitten)
