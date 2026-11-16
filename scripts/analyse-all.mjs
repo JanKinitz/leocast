@@ -99,7 +99,8 @@ queue.sort((a, b) => Number(isRef(b)) - Number(isRef(a)));
 
 const started = Date.now();
 let analysed = 0;
-for (const ep of queue) {
+for (let qi = 0; qi < queue.length; qi++) {
+  const ep = queue[qi];
   if (Date.now() - started > MAX_RUNTIME_MS) break;
   const h = hashUrl(ep.audioUrl);
   const known = index.entries[h];
@@ -111,8 +112,11 @@ for (const ep of queue) {
   const q = new URLSearchParams({ v: "2", audio: ep.audioUrl, title: ep.title, show: ep.show, debug: "1", r: String(Date.now()) });
   const { ok, status, data } = await json(`${BASE}/api/analyze?${q}`);
   if (status === 429) {
-    console.log(`Kontingent aufgebraucht (${data.error || ""}) – Rest beim nächsten Lauf`);
-    break;
+    // Stunden-Kontingent: 10 Minuten warten und dieselbe Folge erneut versuchen
+    console.log(`Kontingent gerade aufgebraucht – warte 10 Minuten (${String(data.error || "").slice(0, 120)})`);
+    await sleep(10 * 60 * 1000);
+    qi--;
+    continue;
   }
   if (ok) {
     const { segments, ...rest } = data;
