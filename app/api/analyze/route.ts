@@ -84,19 +84,30 @@ async function transcribe(audio: Uint8Array, key: string): Promise<Seg[]> {
   return (data.segments || []).map((s: Seg) => ({ start: s.start, end: s.end, text: String(s.text).trim() }));
 }
 
+// Version der Anweisung: steigt, wenn sich die Erkennung ändert (Vorab-Analyse prüft dann alles neu)
+const PROMPT_VERSION = 3;
+
 const PROMPT = `Du bekommst den Anfang einer Kinder-Podcast-Folge (automatisch abgeschrieben) als nummerierte Abschnitte,
 dazu den Titel der Folge. Teile die Abschnitte in zusammenhängende Blöcke ein. Jeder Block hat einen Typ:
-W = eingespielte Fremdwerbung (Spots für Produkte, Firmen, Apps, Versicherungen, andere Podcasts; oft andere Stimme)
-I = Vorspann der Sendung: Begrüßung, Vorstellen, Erkennungsmelodie, wer sich die Folge gewünscht hat, Grüße an Kinder,
-    Wünsche-Aufruf, Eigenwerbung (werbefrei hören, Unterstützer, Abo, Bewertung), Hinweise
-E = Einschlaf-Ritual und Entspannung: hinlegen, zudecken, Augen schließen, atmen ("ein und aus"), Körper wird schwer
-    und warm, zur Ruhe kommen, Reise an einen Ort der Ruhe, Begleitfigur holt das Kind ab und bringt es zur Geschichte
-    ("mach dich bereit", "kommt jetzt zu dir", "steig auf", "wir fliegen los"). Solange noch übergeleitet wird: E.
-G = die eigentliche Geschichte bzw. der eigentliche Inhalt: erzählte Handlung mit Figuren, Ort und Ereignissen,
-    meist passend zum Titel der Folge; bei Wissens-Sendungen das eigentliche Thema.
+W = eingespielte Fremdwerbung: Spots für Produkte, Firmen, Apps, Versicherungen, Shops oder andere Podcasts, meist mit
+    anderer Stimme und ohne Bezug zur Sendung. Begrüßung oder Eigenwerbung der Sprecherin der Sendung ist KEIN W.
+I = Vorspann der Sendung: Erkennungsmelodie, Begrüßung, Vorstellen, wer sich die Folge gewünscht hat, Grüße,
+    Wünsche-Aufruf, Eigenwerbung der Sendung (werbefrei hören, Unterstützer, Abo, Bewertung), Hinweise
+E = Entspannung vor der Geschichte: hinlegen, zudecken, Augen schließen, atmen ("ein und aus"), Körper wird schwer und
+    warm, ganz ruhig werden
+G = die eigentliche Geschichte bzw. Fantasiereise. Sie beginnt in dem Moment, in dem die erzählte Welt einsetzt:
+    eine Figur kommt dazu oder ein Ort wird betreten bzw. vorgestellt – auch wenn das in jeder Folge gleich anfängt.
+    Bei Wissens-Sendungen: das eigentliche Thema.
 O = Abspann (Verabschiedung, Gute-Nacht-Wünsche am Ende)
-Wichtig: Eine Begleitfigur oder ein Ritual, das in jeder Folge gleich ist, ist noch NICHT die Geschichte.
-Die Geschichte beginnt erst dort, wo erzählt wird, was in DIESER Folge passiert.
+
+Beispiele (echte Folgen, von Eltern geprüft):
+- LALUNA Traumreisen: nach der Fremdwerbung kommt die Begrüßung und wer sich die Folge gewünscht hat (I), dann
+  "Hallo du kleiner Held ..." mit Hinlegen und Atmen (E). Die Geschichte (G) beginnt mit dem Satz
+  "Luna, die kleine Zauberkatze, kommt jetzt zu dir ...".
+- Bleib entspannt!: nach der Fremdwerbung Begrüßung/Vorspann (I), dann "Hallo du, schön dass du da bist ..." mit
+  Entspannung (E). Die Geschichte (G) beginnt mit "Stelle dir jetzt vor, du stehst an deinem Fenster ...".
+- CheckPod: nach kurzer Fremdwerbung beginnt der Podcast direkt mit dem Thema (G), ohne Entspannung.
+
 Antworte nur mit kurzem JSON. Für jeden Block nur die Nummer des ERSTEN Abschnitts und den Typ, in Reihenfolge, z. B.:
 {"blocks":[{"from":0,"type":"W"},{"from":4,"type":"I"},{"from":11,"type":"E"},{"from":27,"type":"G"}],
 "reason":"<ein kurzer Satz, woran du den Beginn der Geschichte erkennst>"}`;
@@ -231,6 +242,7 @@ export async function GET(request: Request) {
         reason: d.reason,
         model: d.model,
         window: WINDOW_SEC,
+        pv: PROMPT_VERSION,
         ...(d.warnings.length ? { warnings: d.warnings.map((w) => w.slice(0, 300)) } : {}),
         // Zum Nachprüfen im Elternbereich: Abschnitte mit Zeit und Einordnung
         ...(debug ? { segments: segs.map((x, i) => ({ t: Math.round(x.start), l: d.labels[i], text: x.text })) } : {}),

@@ -13,6 +13,7 @@ const PER_PODCAST = Number(process.env.PER_PODCAST || 15);
 // Kostenloses Groq-Kontingent: max. 2 Stunden Audio pro Stunde, 8 Minuten pro Folge → höchstens 15 Folgen pro Stunde
 const PAUSE_MS = Number(process.env.PAUSE_MS || 245_000);
 const MAX_RUNTIME_MS = Number(process.env.MAX_RUNTIME_MS || 5 * 60 * 60 * 1000);
+const PROMPT_VERSION = 3; // wie in app/api/analyze/route.ts
 const RETRY_ERRORS_AFTER = 7 * 24 * 3600 * 1000;
 
 const podcasts = JSON.parse(readFileSync(new URL("../lib/default-podcasts.json", import.meta.url), "utf8"));
@@ -91,6 +92,10 @@ for (const p of [...podcasts, ...extra]) {
 }
 const queue = [];
 for (let i = 0; i < PER_PODCAST; i++) for (const l of lists) if (l[i]) queue.push(l[i]);
+// Referenz-Folgen (von Eltern geprüft) zuerst, damit Verbesserungen schnell messbar sind
+const reference = JSON.parse(readFileSync(new URL("../lib/reference-markers.json", import.meta.url), "utf8"));
+const isRef = (e) => reference.some((r) => e.title.includes(r.title));
+queue.sort((a, b) => Number(isRef(b)) - Number(isRef(a)));
 
 const started = Date.now();
 let analysed = 0;
@@ -99,7 +104,8 @@ for (const ep of queue) {
   const h = hashUrl(ep.audioUrl);
   const known = index.entries[h];
   // Fehler erneut versuchen – außer bei Folgen, die grundsätzlich nicht gehen (kein MP3)
-  const retryNoStory = known && !known.error && known.storyStart == null && (known.window || 0) < 480;
+  // neu prüfen, wenn die Erkennung seitdem verbessert wurde (Version der Anweisung)
+  const retryNoStory = known && !known.error && (known.pv || 0) < PROMPT_VERSION;
   if (known && !retryNoStory && (!known.error || (/MP3/.test(known.error) && Date.now() - known.at < RETRY_ERRORS_AFTER))) continue;
 
   const q = new URLSearchParams({ v: "2", audio: ep.audioUrl, title: ep.title, show: ep.show, debug: "1", r: String(Date.now()) });
@@ -125,4 +131,23 @@ for (const ep of queue) {
 }
 save();
 publish();
+
+// Abgleich mit den Referenzwerten der Eltern
+const t = (s) => (s == null ? "–" : `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, "0")}`);
+console.log("\nReferenz-Abgleich (Eltern ↔ KI):");
+for (const r of reference) {
+  const ep = queue.find((e) => e.title.includes(r.title));
+  const m = ep && index.entries[hashUrl(ep.audioUrl)];
+  if (!m || m.error) {
+    console.log(`  ${r.title}: noch nicht analysiert ${m?.error || ""}`);
+    continue;
+  }
+  // Werbung kann bei jedem Abruf anders lang sein: Abstand Werbe-Ende → Geschichte vergleichen
+  const kiGap = m.storyStart != null ? m.storyStart - (m.contentStart || 0) : null;
+  const refGap = r.story != null ? r.story - r.adEnd : null;
+  const diff = kiGap != null && refGap != null ? Math.round(kiGap - refGap) : null;
+  console.log(
+    `  ${r.title}: Werbung bis ${t(m.contentStart)} (Eltern ${t(r.adEnd)}), Geschichte ab ${t(m.storyStart)} (Eltern ${t(r.story)}), Abweichung ${diff == null ? "–" : diff + " s"}`,
+  );
+}
 console.log(`Fertig: ${analysed} Folgen analysiert, ${Object.keys(index.entries).length} im Verzeichnis`);
