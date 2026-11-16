@@ -10,6 +10,7 @@ import { storageEstimate } from "@/lib/offline";
 import { getDownloads, useStoreVersion } from "@/lib/store";
 import { allPodcasts } from "@/lib/library";
 import PodcastManager from "@/components/PodcastManager";
+import AnalysisPanel from "@/components/AnalysisPanel";
 import { canInstall, isStandalone, onInstallChange, promptInstall } from "@/lib/install";
 
 function InstallCard() {
@@ -229,6 +230,8 @@ export default function Eltern() {
       <InstallCard />
 
       <IntroSettings />
+
+      <AnalysisPanel />
 
       <section className="card">
         <h2>Prüfprotokoll</h2>

@@ -19,9 +19,44 @@ export type Markers = {
   absolute: boolean;
   source: "ki" | "chapters" | "transcript" | "eingestellt" | "none";
   firstWords?: string | null;
+  id?: string;
+  /** Nur KI: Abschnitte mit Einordnung (W Werbung, I Vorspann, E Entspannung, G Geschichte, O Abspann) */
+  segments?: { t: number; l: string; text: string }[];
+  model?: string;
+  reason?: string;
+  title?: string;
+  corrected?: boolean;
 };
 
-const key = (id: string) => `leocast:markers2:${id}`;
+/** Alle gespeicherten KI-Analysen (für den Elternbereich) */
+export function analysedEpisodes(): Markers[] {
+  if (typeof localStorage === "undefined") return [];
+  const out: Markers[] = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (k?.startsWith("leocast:markers3:")) {
+      const m = read<Markers | null>(k, null);
+      if (m?.source === "ki" && m.segments) out.push(m);
+    }
+  }
+  return out;
+}
+
+/** Analyse einer Folge verwerfen, damit sie neu gemacht wird */
+export function forgetMarkers(id: string) {
+  write(nonceKey(id), Date.now());
+  if (typeof localStorage !== "undefined") localStorage.removeItem(key(id));
+  write(key(id), null);
+}
+
+/** Eltern korrigieren den Beginn der Geschichte für genau diese Folge */
+export function setStoryStart(id: string, sec: number) {
+  const m = read<Markers | null>(key(id), null);
+  if (m) write(key(id), { ...m, story: sec, corrected: true });
+}
+
+const key = (id: string) => `leocast:markers3:${id}`;
+const nonceKey = (id: string) => `leocast:reanalyse:${id}`;
 const manualKey = (podcastId: string) => `leocast:intro:${podcastId}`;
 const autoKey = (podcastId: string) => `leocast:autostory:${podcastId}`;
 const pending = new Map<string, Promise<Markers | null>>();
@@ -51,7 +86,11 @@ export async function aiConfigured(): Promise<boolean> {
 
 async function fromAi(item: MediaItem): Promise<Markers | null> {
   if (!item.audioUrl) return null;
-  const res = await fetch(`/api/analyze?audio=${encodeURIComponent(item.audioUrl)}`);
+  const show = item.podcastId ? podcastById(item.podcastId)?.name || "" : "";
+  const q = new URLSearchParams({ v: "2", audio: item.audioUrl, title: item.title, show, debug: "1" });
+  const nonce = read<number | null>(nonceKey(item.id), null);
+  if (nonce) q.set("r", String(nonce));
+  const res = await fetch(`/api/analyze?${q.toString()}`);
   const data = await res.json();
   if (!res.ok) {
     log("info", `KI-Analyse „${item.title}“: ${data.error || res.status}`);
@@ -64,7 +103,12 @@ async function fromAi(item: MediaItem): Promise<Markers | null> {
     totalSec: data.totalSec,
     absolute: true,
     source: "ki",
+    id: item.id,
     firstWords: data.firstWords,
+    segments: data.segments,
+    model: data.model,
+    reason: data.reason,
+    title: item.title,
   };
 }
 

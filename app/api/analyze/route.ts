@@ -81,52 +81,87 @@ async function transcribe(audio: Uint8Array, key: string): Promise<Seg[]> {
   return (data.segments || []).map((s: Seg) => ({ start: s.start, end: s.end, text: String(s.text).trim() }));
 }
 
-const PROMPT = `Du bekommst den Anfang einer Kinder-Podcast-Folge als nummerierte Abschnitte mit Zeitangabe.
-Bestimme zwei Stellen:
-1. "content": erster Abschnitt der eigentlichen Folge, also nach eingespielter Fremdwerbung (Werbespots für Produkte,
-   Firmen, Apps oder andere Podcasts, oft mit anderer Stimme). Gibt es keine Fremdwerbung am Anfang: 0.
-2. "story": erster Abschnitt, mit dem die eigentliche Geschichte bzw. der eigentliche Inhalt beginnt. Davor liegen oft:
-   Begrüßung, Vorstellen der Sprecherin, wer sich die Geschichte gewünscht hat, Grüße, Eigenwerbung (werbefrei hören,
-   Unterstützer, Abo), Hinweise, und Einschlaf-, Atem- oder Entspannungsübungen ("leg dich hin", "atme ein und aus",
-   "deine Arme werden schwer"). Diese gehören NICHT zur Geschichte. Die Geschichte beginnt, wenn erzählt wird
-   (Figuren, Ort, Handlung, "Es war einmal", "Heute reisen wir ..."), bzw. bei Wissens-Sendungen, wenn das Thema beginnt.
-   Wenn der Vorspann kürzer als 20 Sekunden ist, gib "story": null an. Wenn die Geschichte im Text noch nicht beginnt: null.
-Antworte nur mit JSON: {"content": <nummer>, "story": <nummer oder null>, "reason": "<ein kurzer Satz>"}`;
+const PROMPT = `Du bekommst den Anfang einer Kinder-Podcast-Folge (automatisch abgeschrieben) als nummerierte Abschnitte
+mit Zeitangabe, dazu den Titel der Folge. Ordne JEDEM Abschnitt genau einen Buchstaben zu:
+W = eingespielte Fremdwerbung (Spots für Produkte, Firmen, Apps, Versicherungen, andere Podcasts; oft andere Stimme)
+I = Vorspann der Sendung: Begrüßung, Vorstellen, Erkennungsmelodie, wer sich die Folge gewünscht hat, Grüße an Kinder,
+    Wünsche-Aufruf, Eigenwerbung (werbefrei hören, Unterstützer, Abo, Bewertung), Hinweise
+E = Einschlaf-Ritual und Entspannung: hinlegen, zudecken, Augen schließen, atmen ("ein und aus"), Körper wird schwer
+    und warm, zur Ruhe kommen, Reise an einen Ort der Ruhe, Begleitfigur holt das Kind ab und bringt es zur Geschichte
+    ("mach dich bereit", "kommt jetzt zu dir", "steig auf", "wir fliegen los"). Solange noch übergeleitet wird: E.
+G = die eigentliche Geschichte bzw. der eigentliche Inhalt: erzählte Handlung mit Figuren, Ort und Ereignissen,
+    meist passend zum Titel der Folge; bei Wissens-Sendungen das eigentliche Thema.
+O = Abspann (Verabschiedung, Gute-Nacht-Wünsche am Ende)
+Wichtig: Eine Begleitfigur oder ein Ritual, das in jeder Folge gleich ist, ist noch NICHT die Geschichte.
+Die Geschichte beginnt erst dort, wo erzählt wird, was in DIESER Folge passiert.
+Antworte nur mit JSON: {"labels": "<ein Buchstabe pro Abschnitt, in Reihenfolge, ohne Leerzeichen>",
+"reason": "<ein kurzer Satz, woran du den Beginn der Geschichte erkennst>"}`;
 
-async function decide(segs: Seg[], key: string): Promise<{ content: number; story: number | null; reason: string }> {
+type Decision = { content: number; story: number | null; reason: string; labels: string; model: string };
+
+async function decide(segs: Seg[], key: string, title: string, show: string): Promise<Decision> {
   const lines = segs
     .map((s, i) => `[${i}] ${Math.floor(s.start / 60)}:${String(Math.floor(s.start % 60)).padStart(2, "0")} ${s.text}`)
     .join("\n");
+  const user = `Sendung: ${show || "unbekannt"}\nTitel der Folge: ${title || "unbekannt"}\nAnzahl Abschnitte: ${segs.length}\n\n${lines}`;
   const models = [process.env.GROQ_LLM_MODEL, "openai/gpt-oss-120b", "llama-3.3-70b-versatile"].filter(Boolean) as string[];
   let lastError = "";
   for (const model of models) {
+    const body: Record<string, unknown> = {
+      model,
+      temperature: 0,
+      response_format: { type: "json_object" },
+      messages: [
+        { role: "system", content: PROMPT },
+        { role: "user", content: user },
+      ],
+    };
+    if (model.startsWith("openai/gpt-oss")) body.reasoning_effort = "high";
     const res = await fetch(`${GROQ}/chat/completions`, {
       method: "POST",
       headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model,
-        temperature: 0,
-        response_format: { type: "json_object" },
-        messages: [
-          { role: "system", content: PROMPT },
-          { role: "user", content: lines },
-        ],
-      }),
+      body: JSON.stringify(body),
     });
     if (!res.ok) {
-      lastError = `${model}: ${res.status}`;
+      lastError = `${model}: ${res.status} ${(await res.text()).slice(0, 120)}`;
       continue;
     }
     const data = await res.json();
-    const out = JSON.parse(data.choices?.[0]?.message?.content || "{}");
-    const valid = (n: unknown) => typeof n === "number" && Number.isInteger(n) && n >= 0 && n < segs.length;
-    return {
-      content: valid(out.content) ? out.content : 0,
-      story: valid(out.story) ? out.story : null,
-      reason: String(out.reason || "").slice(0, 200),
-    };
+    let out: { labels?: string; reason?: string } = {};
+    try {
+      out = JSON.parse(data.choices?.[0]?.message?.content || "{}");
+    } catch {
+      lastError = `${model}: keine gültige Antwort`;
+      continue;
+    }
+    let labels = String(out.labels || "").toUpperCase().replace(/[^WIEGO]/g, "");
+    if (labels.length < segs.length * 0.8) {
+      lastError = `${model}: ${labels.length} von ${segs.length} Abschnitten bewertet`;
+      continue;
+    }
+    labels = labels.slice(0, segs.length).padEnd(segs.length, labels[labels.length - 1] || "G");
+    return { ...fromLabels(labels, segs), reason: String(out.reason || "").slice(0, 200), labels, model };
   }
   throw new Error(`Sprachmodell nicht erreichbar (${lastError})`);
+}
+
+/** Werbung endet beim ersten Nicht-W; Geschichte = erster G-Abschnitt, nach dem es überwiegend mit G weitergeht */
+function fromLabels(labels: string, segs: Seg[]): { content: number; story: number | null } {
+  let content = 0;
+  while (content < labels.length && labels[content] === "W") content++;
+  if (content >= labels.length) content = 0;
+  let story: number | null = null;
+  for (let i = content; i < labels.length; i++) {
+    if (labels[i] !== "G") continue;
+    const next = labels.slice(i, i + 6);
+    const g = [...next].filter((c) => c === "G").length;
+    if (g >= Math.min(4, next.length) && !next.includes("E")) {
+      story = i;
+      break;
+    }
+  }
+  if (story != null && segs[story].start - segs[content].start < 20) story = null;
+  return { content, story };
 }
 
 export async function GET(request: Request) {
@@ -137,6 +172,9 @@ export async function GET(request: Request) {
   if (params.get("check")) return Response.json({ configured: Boolean(key) }, { headers: { "Cache-Control": "no-store" } });
 
   const audio = params.get("audio") || "";
+  const title = (params.get("title") || "").slice(0, 200);
+  const show = (params.get("show") || "").slice(0, 100);
+  const debug = params.get("debug") === "1";
   const noStore = { "Cache-Control": "no-store" };
   if (!key) return Response.json({ error: "KI-Analyse nicht eingerichtet" }, { status: 503, headers: noStore });
   if (!/^https?:\/\//.test(audio)) return Response.json({ error: "Audio-Adresse fehlt" }, { status: 400, headers: noStore });
@@ -154,7 +192,7 @@ export async function GET(request: Request) {
     const segs = (await transcribe(part.bytes, key)).filter((s) => s.text);
     if (segs.length < 3) throw new Error("Zu wenig Sprache erkannt");
 
-    const d = await decide(segs, key);
+    const d = await decide(segs, key, title, show);
     const total = head.total ?? part.total;
     const totalSec = total ? Math.round(((total - id3) * 8) / (kbps * 1000)) : null;
     const story = d.story != null ? segs[d.story].start : null;
@@ -167,6 +205,9 @@ export async function GET(request: Request) {
         totalSec,
         firstWords: d.story != null ? segs[d.story].text.slice(0, 120) : null,
         reason: d.reason,
+        model: d.model,
+        // Zum Nachprüfen im Elternbereich: Abschnitte mit Zeit und Einordnung
+        ...(debug ? { segments: segs.map((x, i) => ({ t: Math.round(x.start), l: d.labels[i], text: x.text })) } : {}),
       },
       { headers: { "Cache-Control": "public, s-maxage=2592000, stale-while-revalidate=2592000" } },
     );
