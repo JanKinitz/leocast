@@ -125,3 +125,21 @@ export function unmarkDownloaded(id: string) {
   delete d[id];
   write(DOWNLOADS, d);
 }
+
+// ---- Spotify-Auswahl der Eltern (Playlists und Alben, wird zwischen den Geräten abgeglichen) ----
+const PICKS = "leocast:spotify-picks";
+export type PickEntry = { kind: "playlist" | "album"; id: string; name: string; image?: string; by?: string; at: number };
+
+export function getPicks(): PickEntry[] {
+  return Object.values(read(PICKS, {} as Record<string, PickEntry>)).sort((a, b) => a.at - b.at);
+}
+export function addPick(p: Omit<PickEntry, "at">) {
+  const map = read(PICKS, {} as Record<string, PickEntry>);
+  map[p.id] = { ...p, at: Date.now() };
+  write(PICKS, map);
+}
+export function removePick(id: string) {
+  const map = read(PICKS, {} as Record<string, PickEntry>);
+  delete map[id];
+  write(PICKS, map);
+}

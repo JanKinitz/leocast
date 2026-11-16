@@ -12,6 +12,7 @@ import { allPodcasts, isAiEnabled, setAiEnabled } from "@/lib/library";
 import PodcastManager from "@/components/PodcastManager";
 import AnalysisPanel from "@/components/AnalysisPanel";
 import SyncCard from "@/components/SyncCard";
+import SpotifyPicks from "@/components/SpotifyPicks";
 import { canInstall, isStandalone, onInstallChange, promptInstall } from "@/lib/install";
 
 function InstallCard() {
@@ -251,10 +252,14 @@ export default function Eltern() {
           </>
         ) : (
           <>
-            <p>Für die Musik einmal mit dem Spotify-Konto des Kindes anmelden.</p>
+            <p className="warn-box">
+              Auf diesem Gerät noch nicht bei Spotify angemeldet. Ohne Anmeldung ist „Meine Lieder“ hier ausgeblendet.
+            </p>
+            <p>Einmal mit dem Spotify-Konto des Kindes anmelden.</p>
             <button onClick={() => startLogin()}>Mit Spotify anmelden</button>
           </>
         )}
+        <SpotifyPicks loggedIn={spotifyLoggedIn} />
       </section>
 
       <section className="card">

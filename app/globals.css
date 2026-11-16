@@ -1565,3 +1565,124 @@ h3 {
   display: flex;
   align-items: center;
 }
+
+.warn-box {
+  padding: 10px 14px;
+  border-radius: 14px;
+  background: rgba(255, 138, 61, 0.18);
+  box-shadow: inset 0 0 0 2px var(--pill);
+  font-weight: 800;
+}
+
+/* ---------- Figuren zwischen den Kacheln ---------- */
+.figure-tile {
+  flex: none;
+  align-self: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: 130px;
+  min-height: 130px;
+  padding: 6px;
+  border: 0;
+  background: transparent;
+  scroll-snap-align: center;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.figure-art {
+  width: 110px;
+  height: 110px;
+  overflow: visible;
+  filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.35));
+  animation: figure-idle 4s ease-in-out infinite;
+  transform-origin: 50% 90%;
+}
+
+.figure-name {
+  font-weight: 900;
+  font-size: 16px;
+  color: var(--muted);
+}
+
+@keyframes figure-idle {
+  0%, 100% { transform: translateY(0) rotate(0); }
+  50% { transform: translateY(-3px) rotate(-2deg); }
+}
+
+.figure-tile.active .figure-art { animation-duration: 1s; animation-iteration-count: 1; animation-timing-function: ease-in-out; }
+.figure-tile.active.anim-bounce .figure-art { animation-name: fig-bounce; }
+.figure-tile.active.anim-wobble .figure-art { animation-name: fig-wobble; }
+.figure-tile.active.anim-spin .figure-art { animation-name: fig-spin; transform-origin: 50% 50%; }
+.figure-tile.active.anim-float .figure-art { animation-name: fig-float; animation-duration: 1.4s; }
+.figure-tile.active.anim-hop .figure-art { animation-name: fig-hop; }
+.figure-tile.active.anim-twinkle .figure-art { animation-name: fig-twinkle; transform-origin: 50% 50%; }
+.figure-tile.active.anim-launch .figure-art { animation-name: fig-launch; animation-duration: 1.3s; }
+.figure-tile.active.anim-buzz .figure-art { animation-name: fig-buzz; }
+.figure-tile.active.anim-wave .figure-art { animation-name: fig-wave; }
+.figure-tile.active.anim-roll .figure-art { animation-name: fig-roll; transform-origin: 50% 65%; }
+
+@keyframes fig-bounce {
+  0%, 100% { transform: translateY(0) scale(1); }
+  20% { transform: translateY(0) scale(1.15, 0.85); }
+  45% { transform: translateY(-34px) scale(0.92, 1.1); }
+  70% { transform: translateY(0) scale(1.1, 0.9); }
+}
+@keyframes fig-wobble {
+  0%, 100% { transform: rotate(0); }
+  20% { transform: rotate(-14deg); }
+  40% { transform: rotate(12deg); }
+  60% { transform: rotate(-8deg); }
+  80% { transform: rotate(5deg); }
+}
+@keyframes fig-spin {
+  0% { transform: rotate(0) scale(1); }
+  50% { transform: rotate(180deg) scale(1.15); }
+  100% { transform: rotate(360deg) scale(1); }
+}
+@keyframes fig-float {
+  0%, 100% { transform: translate(0, 0); opacity: 1; }
+  30% { transform: translate(-10px, -24px); opacity: 0.6; }
+  60% { transform: translate(10px, -14px); opacity: 0.85; }
+}
+@keyframes fig-hop {
+  0%, 100% { transform: translateY(0); }
+  25% { transform: translateY(-28px) rotate(-6deg); }
+  50% { transform: translateY(0); }
+  75% { transform: translateY(-16px) rotate(6deg); }
+}
+@keyframes fig-twinkle {
+  0%, 100% { transform: scale(1) rotate(0); filter: drop-shadow(0 0 0 #ffd43b); }
+  50% { transform: scale(1.25) rotate(20deg); filter: drop-shadow(0 0 16px #ffd43b); }
+}
+@keyframes fig-launch {
+  0% { transform: translateY(0); }
+  15% { transform: translateY(4px) scale(1.05, 0.95); }
+  55% { transform: translateY(-120px); opacity: 0; }
+  56% { transform: translateY(40px); opacity: 0; }
+  100% { transform: translateY(0); opacity: 1; }
+}
+@keyframes fig-buzz {
+  0%, 100% { transform: translate(0, 0); }
+  10% { transform: translate(-6px, -4px) rotate(-6deg); }
+  20% { transform: translate(6px, -8px) rotate(6deg); }
+  30% { transform: translate(-8px, -2px); }
+  45% { transform: translate(10px, -12px) rotate(8deg); }
+  60% { transform: translate(-6px, -6px) rotate(-8deg); }
+  80% { transform: translate(4px, -2px); }
+}
+@keyframes fig-wave {
+  0%, 100% { transform: rotate(0); }
+  15%, 45%, 75% { transform: rotate(-10deg) translateY(-4px); }
+  30%, 60%, 90% { transform: rotate(10deg) translateY(-4px); }
+}
+@keyframes fig-roll {
+  0% { transform: translateX(0) rotate(0); }
+  50% { transform: translateX(26px) rotate(360deg); }
+  100% { transform: translateX(0) rotate(720deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .figure-art { animation: none !important; }
+}

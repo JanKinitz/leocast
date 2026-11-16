@@ -25,6 +25,14 @@
     "ai": false
   },
   {
+    "id": "hoer-dich-fit",
+    "name": "Hör dich fit!",
+    "search": "Hör dich fit Stiftung Kindergesundheit",
+    "color": "#c2410c",
+    "category": "podcasts",
+    "ai": false
+  },
+  {
     "id": "laluna",
     "name": "LALUNA Traumreisen",
     "search": "LALUNA Traumreisen",

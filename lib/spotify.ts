@@ -252,3 +252,54 @@ export async function getDevices() {
     "/me/player/devices",
   );
 }
+
+// ---- Auswahl der Eltern: Playlists und Alben suchen ----
+export type SpotifyPick = { kind: "playlist" | "album"; id: string; name: string; image?: string; by?: string };
+
+export async function searchSpotify(q: string): Promise<SpotifyPick[]> {
+  // Seit Februar 2026 liefert die Suche höchstens 10 Treffer je Art
+  const data = await api<{ playlists?: { items: any[] }; albums?: { items: any[] } }>(
+    `/search?type=album,playlist&limit=10&market=from_token&q=${encodeURIComponent(q)}`,
+  );
+  const albums: SpotifyPick[] = (data?.albums?.items || []).filter(Boolean).map((a: any) => ({
+    kind: "album",
+    id: a.id,
+    name: a.name,
+    image: a.images?.[0]?.url,
+    by: (a.artists || []).map((x: any) => x.name).join(", "),
+  }));
+  const playlists: SpotifyPick[] = (data?.playlists?.items || []).filter(Boolean).map((p: any) => ({
+    kind: "playlist",
+    id: p.id,
+    name: p.name,
+    image: p.images?.[0]?.url,
+    by: p.owner?.display_name,
+  }));
+  // abwechselnd mischen, damit beide Arten oben auftauchen
+  const out: SpotifyPick[] = [];
+  for (let i = 0; i < Math.max(albums.length, playlists.length); i++) {
+    if (albums[i]) out.push(albums[i]);
+    if (playlists[i]) out.push(playlists[i]);
+  }
+  return out;
+}
+
+export async function getAlbumTracks(id: string): Promise<{ name: string; image?: string; items: PlayableItem[] }> {
+  const a = await api<any>(`/albums/${id}?market=from_token`);
+  const image = a?.images?.[0]?.url;
+  const items: PlayableItem[] = (a?.tracks?.items || [])
+    .filter((t: any) => t && t.uri)
+    .map((t: any) => ({
+      id: t.id,
+      name: t.name,
+      uri: t.uri,
+      type: "track" as const,
+      duration_ms: t.duration_ms,
+      is_playable: t.is_playable,
+      restrictions: t.restrictions,
+      image,
+      subtitle: (t.artists || []).map((x: any) => x.name).join(", "),
+    }))
+    .filter((x: PlayableItem) => x.is_playable !== false && !x.restrictions);
+  return { name: a?.name || "Album", image, items };
+}

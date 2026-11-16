@@ -8,7 +8,7 @@ import { getDownloads, read, setWriteHook, writeRaw } from "./store";
 import { emptyState, type DeviceInfo, type Stamped, type SyncState } from "./syncCore";
 import { log } from "./diagnostics";
 
-const MAP_KEYS = ["leocast:likes", "leocast:progress", "leocast:podcast-category"];
+const MAP_KEYS = ["leocast:likes", "leocast:progress", "leocast:podcast-category", "leocast:spotify-picks"];
 const LIST_KEYS = ["leocast:custom-podcasts"]; // Listen von Objekten mit id
 const SCALAR_KEYS = ["leocast:hidden-podcasts"];
 const SCALAR_PREFIXES = ["leocast:intro:", "leocast:autostory:", "leocast:ai:"];

@@ -11,6 +11,7 @@ import { podcastById } from "@/lib/library";
 import { episodeItem } from "@/lib/podcasts";
 import { getDownloads, getProgress, isLiked, toggleLike, useStoreVersion } from "@/lib/store";
 import OfflinePicker from "@/components/OfflinePicker";
+import { withFigures } from "@/components/Figures";
 import { prefetchMarkers } from "@/lib/markers";
 import { img } from "@/lib/img";
 
@@ -82,9 +83,10 @@ export default function Sendung() {
 
       {all.length > 0 && (
         <Rail title={online ? "Folgen" : "Ohne Internet hörbar"}>
-          {[...fresh, ...heard].map((it) => (
-            <PlayTile key={it.id} item={it} more={all} wide />
-          ))}
+          {withFigures(
+            [...fresh, ...heard].map((it) => <PlayTile key={it.id} item={it} more={all} wide />),
+            1,
+          )}
         </Rail>
       )}
 

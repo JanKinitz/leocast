@@ -3,10 +3,11 @@
 // Startseite: Weiterhören, Meine Podcasts, Meine Lieder, Gute Nacht – alles als wischbare Kachel-Reihen.
 import InstallBanner from "@/components/InstallBanner";
 import TopNav from "@/components/TopNav";
+import { withFigures } from "@/components/Figures";
 import { LinkTile, PlayTile, Rail } from "@/components/Tiles";
 import { useFeed, useOnline, useSpotifyPlaylists } from "@/components/hooks";
 import { allPodcasts, colorFor, type PodcastSource } from "@/lib/library";
-import { continueListening, getDownloads, useStoreVersion } from "@/lib/store";
+import { continueListening, getDownloads, getPicks, useStoreVersion } from "@/lib/store";
 import { cachedFeed, episodeItem } from "@/lib/podcasts";
 
 function PodcastTile({ source }: { source: PodcastSource }) {
@@ -21,7 +22,16 @@ function hasOffline(source: PodcastSource) {
 export default function Home() {
   useStoreVersion();
   const online = useOnline();
-  const { playlists } = useSpotifyPlaylists();
+  const { loggedIn, playlists } = useSpotifyPlaylists();
+  // Meine Lieder: Auswahl der Eltern (Playlists, Alben) und die eigenen Playlists des Kinderkontos.
+  // Nur mit Spotify-Anmeldung auf diesem Gerät und mit Internet – sonst ließe sich nichts abspielen.
+  const picks = getPicks();
+  const music = [
+    ...picks.map((p) => ({ id: p.id, href: `/${p.kind}/${p.id}`, name: p.name, image: p.image })),
+    ...playlists
+      .filter((pl) => !picks.some((p) => p.id === pl.id))
+      .map((pl) => ({ id: pl.id, href: `/playlist/${pl.id}`, name: pl.name, image: pl.images?.[0]?.url })),
+  ];
   const resume = continueListening().filter((p) => online || !!getDownloads()[p.item.id]);
   const library = allPodcasts();
   const podcasts = library.filter((p) => p.category === "podcasts" && (online || hasOffline(p)));
@@ -47,16 +57,14 @@ export default function Home() {
 
       {podcasts.length > 0 && (
         <Rail title="Meine Podcasts">
-          {podcasts.map((s) => (
-            <PodcastTile key={s.id} source={s} />
-          ))}
+          {withFigures(podcasts.map((s) => <PodcastTile key={s.id} source={s} />))}
         </Rail>
       )}
 
-      {online && playlists.length > 0 && (
+      {online && loggedIn && music.length > 0 && (
         <Rail title="Meine Lieder">
-          {playlists.map((pl) => (
-            <LinkTile key={pl.id} href={`/playlist/${pl.id}`} title={pl.name} image={pl.images?.[0]?.url} color={colorFor(pl.name)} />
+          {music.map((m) => (
+            <LinkTile key={m.id} href={m.href} title={m.name} image={m.image} color={colorFor(m.name)} />
           ))}
         </Rail>
       )}
