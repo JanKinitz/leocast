@@ -2,6 +2,7 @@
 // und gibt das Ergebnis zurück. Gespeichert wird in Vercel Blob unter einem festen Pfad (alle Geräte der Familie).
 // Geschrieben wird nur, wenn sich wirklich etwas geändert hat (kostenloses Kontingent: 2.000 Schreibvorgänge im Monat).
 import { createHash } from "node:crypto";
+import { blobToken } from "@/lib/blobToken";
 import { head, put } from "@vercel/blob";
 import { analyseList, emptyState, mergeStates, normalizeCode, sameState, type SyncState } from "@/lib/syncCore";
 import defaults from "@/lib/default-podcasts.json";
@@ -19,7 +20,7 @@ const LIST_PATH = "config/analyse-list.json";
 
 async function loadJson<T>(path: string): Promise<T | null> {
   try {
-    const meta = await head(path);
+    const meta = await head(path, { token: blobToken() });
     const res = await fetch(`${meta.url}?t=${Date.now()}`, { cache: "no-store" });
     return res.ok ? ((await res.json()) as T) : null;
   } catch {
@@ -29,7 +30,7 @@ async function loadJson<T>(path: string): Promise<T | null> {
 
 async function load(path: string): Promise<SyncState> {
   try {
-    const meta = await head(path);
+    const meta = await head(path, { token: blobToken() });
     const res = await fetch(`${meta.url}?t=${Date.now()}`, { cache: "no-store" });
     if (!res.ok) return emptyState();
     const data = (await res.json()) as SyncState;
@@ -40,11 +41,13 @@ async function load(path: string): Promise<SyncState> {
 }
 
 export async function GET() {
-  return Response.json({ configured: Boolean(process.env.BLOB_READ_WRITE_TOKEN) }, { headers: noStore });
+  // Zur Fehlersuche nur die Namen passender Variablen (nie die Werte)
+  const names = Object.keys(process.env).filter((n) => /BLOB|READ_WRITE/i.test(n));
+  return Response.json({ configured: Boolean(blobToken()), variables: names }, { headers: noStore });
 }
 
 export async function POST(request: Request) {
-  if (!process.env.BLOB_READ_WRITE_TOKEN)
+  if (!blobToken())
     return Response.json({ error: "Abgleich ist noch nicht eingerichtet" }, { status: 503, headers: noStore });
 
   const raw = await request.text();
@@ -72,6 +75,7 @@ export async function POST(request: Request) {
       allowOverwrite: true,
       contentType: "application/json",
       cacheControlMaxAge: 60,
+      token: blobToken(),
     });
     wrote = true;
     // Liste für die Vorab-Analyse mitpflegen (nur Podcast-Namen und Feed-Adressen, keine Familiendaten)
@@ -84,6 +88,7 @@ export async function POST(request: Request) {
         allowOverwrite: true,
         contentType: "application/json",
         cacheControlMaxAge: 60,
+      token: blobToken(),
       });
     }
   }
