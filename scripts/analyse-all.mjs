@@ -83,6 +83,9 @@ const publish = () => {
   }
 };
 
+save();
+publish();
+
 // Warteschlange: pro Podcast die neuesten Folgen, abwechselnd zwischen den Podcasts
 const lists = [];
 for (const p of [...podcasts, ...extra]) {
