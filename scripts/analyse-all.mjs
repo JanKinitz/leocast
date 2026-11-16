@@ -10,8 +10,8 @@ import { execSync } from "node:child_process";
 const BASE = process.env.LEOCAST_URL || "https://leocast.vercel.app";
 const OUT = process.argv[2] || "markers-out";
 const PER_PODCAST = Number(process.env.PER_PODCAST || 15);
-// Kostenloses Groq-Kontingent: max. 2 Stunden Audio pro Stunde, 7 Minuten pro Folge → höchstens 17 Folgen pro Stunde
-const PAUSE_MS = Number(process.env.PAUSE_MS || 230_000);
+// Kostenloses Groq-Kontingent: max. 2 Stunden Audio pro Stunde, 6 Minuten pro Folge → höchstens 20 Folgen pro Stunde
+const PAUSE_MS = Number(process.env.PAUSE_MS || 190_000);
 const MAX_RUNTIME_MS = Number(process.env.MAX_RUNTIME_MS || 5 * 60 * 60 * 1000);
 const RETRY_ERRORS_AFTER = 7 * 24 * 3600 * 1000;
 
