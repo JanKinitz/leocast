@@ -136,8 +136,10 @@ h3 {
 }
 
 .lock {
-  width: 48px;
-  height: 48px;
+  width: 56px;
+  height: 56px;
+  flex-direction: column;
+  gap: 1px;
   border: 0;
   border-radius: 50%;
   background: transparent;
@@ -152,8 +154,41 @@ h3 {
 .lock.holding {
   background: var(--surface-2);
   color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent);
-  transition: box-shadow 3s linear;
+  animation: lock-fill 3s linear forwards;
+}
+
+@keyframes lock-fill {
+  from {
+    box-shadow: 0 0 0 0 var(--accent);
+  }
+  to {
+    box-shadow: 0 0 0 6px var(--accent);
+  }
+}
+
+.lock-label {
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.lock-wrap {
+  position: relative;
+}
+
+.lock-hint {
+  position: absolute;
+  right: 0;
+  top: 62px;
+  z-index: 30;
+  width: 220px;
+  padding: 10px 14px;
+  border-radius: 14px;
+  background: var(--surface-2);
+  color: var(--ink);
+  font-weight: 700;
+  font-size: 15px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
 }
 
 /* ---------- Reihen und Kacheln ---------- */
@@ -994,4 +1029,99 @@ h3 {
   background: var(--surface, #1e2240);
   font-weight: 800;
   font-size: 18px;
+}
+
+/* ---------- Elternbereich: Podcasts ---------- */
+.pod-list,
+.pod-hits {
+  list-style: none;
+  padding: 0;
+  margin: 10px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.pod-list li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.pod-name {
+  font-weight: 800;
+}
+
+.pod-list select,
+.pod-search input {
+  font: inherit;
+  min-height: 52px;
+  border-radius: 14px;
+  border: 0;
+  padding: 0 12px;
+  background: var(--surface-2);
+  color: var(--ink);
+}
+
+.pod-search {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 8px 0 12px;
+}
+
+.pod-search input {
+  flex: 1 1 220px;
+  min-width: 0;
+}
+
+.pod-hits li {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+  padding: 10px;
+  border-radius: 16px;
+  background: var(--surface-2);
+}
+
+.pod-hits img,
+.pod-noimg {
+  width: 64px;
+  height: 64px;
+  border-radius: 12px;
+  object-fit: cover;
+  background: #2a2f55;
+}
+
+.pod-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.pod-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.linkish {
+  background: none;
+  border: 0;
+  padding: 4px 6px;
+  color: var(--accent);
+  font-weight: 800;
+  text-decoration: underline;
+}
+
+@media (max-width: 600px) {
+  .pod-list li {
+    grid-template-columns: 1fr 1fr;
+  }
+  .pod-list .pod-name {
+    grid-column: 1 / -1;
+  }
 }

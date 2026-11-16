@@ -8,7 +8,8 @@ import { usePlayer } from "@/components/PlayerProvider";
 import { getMe, loadToken, logout, startLogin } from "@/lib/spotify";
 import { storageEstimate } from "@/lib/offline";
 import { getDownloads, useStoreVersion } from "@/lib/store";
-import { PODCASTS } from "@/lib/library";
+import { allPodcasts } from "@/lib/library";
+import PodcastManager from "@/components/PodcastManager";
 import { canInstall, isStandalone, onInstallChange, promptInstall } from "@/lib/install";
 
 function InstallCard() {
@@ -77,7 +78,7 @@ function IntroSettings() {
         brauchst du nur, wenn die Analyse bei einem Podcast nicht klappt.
       </p>
       <ul className="intro-list">
-        {PODCASTS.map((p) => {
+        {allPodcasts().map((p) => {
           const current = getManualIntro(p.id);
           const value = drafts[p.id] ?? fmtMinSec(current);
           return (
@@ -222,6 +223,8 @@ export default function Eltern() {
         </p>
         <p className="hint">Folgen speicherst du in einer Sendung über „Für unterwegs speichern“.</p>
       </section>
+
+      <PodcastManager />
 
       <InstallCard />
 

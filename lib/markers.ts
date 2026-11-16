@@ -4,7 +4,7 @@
 // 1. KI-Analyse der echten Audiodatei (/api/analyze) – Zeiten inklusive Werbung, für alle MP3-Podcasts
 // 2. Ersatz: Kapitel oder Transkript (/api/markers) – Zeiten ohne eingefügte Werbung
 // 3. Ersatz: von Eltern pro Podcast eingestellter Vorspann
-import { PODCASTS, type MediaItem } from "./library";
+import { podcastById, type MediaItem } from "./library";
 import { read, write } from "./store";
 import { log } from "./diagnostics";
 
@@ -70,7 +70,7 @@ async function fromAi(item: MediaItem): Promise<Markers | null> {
 
 async function fromTranscript(item: MediaItem): Promise<Markers | null> {
   if (!item.transcriptUrl && !item.chaptersUrl) return null;
-  const source = PODCASTS.find((p) => p.id === item.podcastId);
+  const source = item.podcastId ? podcastById(item.podcastId) : undefined;
   const q = new URLSearchParams();
   if (item.chaptersUrl) q.set("chapters", item.chaptersUrl);
   if (item.transcriptUrl) q.set("transcript", item.transcriptUrl);

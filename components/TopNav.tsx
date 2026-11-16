@@ -11,8 +11,13 @@ export default function TopNav() {
   const router = useRouter();
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [holding, setHolding] = useState(false);
+  const [hint, setHint] = useState(false);
+  const started = useRef(0);
+  const hintTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const startHold = () => {
+    started.current = Date.now();
+    setHint(false);
     setHolding(true);
     timer.current = setTimeout(() => {
       setHolding(false);
@@ -22,6 +27,13 @@ export default function TopNav() {
   const stopHold = () => {
     setHolding(false);
     if (timer.current) clearTimeout(timer.current);
+    // Kurz getippt: zeigen, wie es geht
+    if (started.current && Date.now() - started.current < 2900) {
+      setHint(true);
+      if (hintTimer.current) clearTimeout(hintTimer.current);
+      hintTimer.current = setTimeout(() => setHint(false), 4000);
+    }
+    started.current = 0;
   };
 
   return (
@@ -39,7 +51,7 @@ export default function TopNav() {
           Ich
         </Link>
       </nav>
-      <div className="topnav-side">
+      <div className="topnav-side lock-wrap">
         <button
           className={`lock ${holding ? "holding" : ""}`}
           aria-label="Elternbereich: 3 Sekunden gedrückt halten"
@@ -50,7 +62,9 @@ export default function TopNav() {
           onContextMenu={(e) => e.preventDefault()}
         >
           <IconLock />
+          <span className="lock-label">Eltern</span>
         </button>
+        {hint && <div className="lock-hint">Für Eltern: Schloss 3 Sekunden gedrückt halten</div>}
       </div>
     </header>
   );

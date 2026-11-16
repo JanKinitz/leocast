@@ -5,13 +5,13 @@ import InstallBanner from "@/components/InstallBanner";
 import TopNav from "@/components/TopNav";
 import { LinkTile, PlayTile, Rail } from "@/components/Tiles";
 import { useFeed, useOnline, useSpotifyPlaylists } from "@/components/hooks";
-import { PODCASTS, colorFor, type PodcastSource } from "@/lib/library";
+import { allPodcasts, colorFor, type PodcastSource } from "@/lib/library";
 import { continueListening, getDownloads, useStoreVersion } from "@/lib/store";
 import { cachedFeed, episodeItem } from "@/lib/podcasts";
 
 function PodcastTile({ source }: { source: PodcastSource }) {
   const { feed } = useFeed(source);
-  return <LinkTile href={`/sendung/${source.id}`} title={source.name} image={feed?.image} color={source.color} size="l" />;
+  return <LinkTile href={`/sendung/${source.id}`} title={source.name} image={feed?.image || source.image} color={source.color} size="l" />;
 }
 
 function hasOffline(source: PodcastSource) {
@@ -23,8 +23,9 @@ export default function Home() {
   const online = useOnline();
   const { playlists } = useSpotifyPlaylists();
   const resume = continueListening().filter((p) => online || !!getDownloads()[p.item.id]);
-  const podcasts = PODCASTS.filter((p) => p.category === "podcasts" && (online || hasOffline(p)));
-  const night = PODCASTS.filter((p) => p.category === "gutenacht" && (online || hasOffline(p)));
+  const library = allPodcasts();
+  const podcasts = library.filter((p) => p.category === "podcasts" && (online || hasOffline(p)));
+  const night = library.filter((p) => p.category === "gutenacht" && (online || hasOffline(p)));
 
   return (
     <main className="page">
@@ -36,7 +37,7 @@ export default function Home() {
       {resume.length > 0 && (
         <Rail title="Weiterhören">
           {resume.map((p) => {
-            const src = PODCASTS.find((s) => s.id === p.item.podcastId);
+            const src = library.find((s) => s.id === p.item.podcastId);
             const feed = src ? cachedFeed(src.id) : null;
             const more = src && feed ? feed.episodes.map((e) => episodeItem(e, src)) : [];
             return <PlayTile key={p.item.id} item={p.item} more={more} wide />;
