@@ -216,6 +216,8 @@ export async function GET(request: Request) {
   const title = (params.get("title") || "").slice(0, 200);
   const show = (params.get("show") || "").slice(0, 100);
   const debug = params.get("debug") === "1";
+  // Kürzeres Fenster (z. B. nur Werbung erkennen bei Wissens-Podcasts) spart Kontingent
+  const windowSec = Math.min(WINDOW_SEC, Math.max(90, Number(params.get("window")) || WINDOW_SEC));
   const noStore = { "Cache-Control": "no-store" };
   if (!key) return Response.json({ error: "KI-Analyse nicht eingerichtet" }, { status: 503, headers: noStore });
   if (!/^https?:\/\//.test(audio)) return Response.json({ error: "Audio-Adresse fehlt" }, { status: 400, headers: noStore });
@@ -228,7 +230,7 @@ export async function GET(request: Request) {
     const kbps = mp3Bitrate(probe, id3 > head.bytes.length - 4 ? 0 : id3);
     if (!kbps) throw new Error("Nur MP3-Folgen können analysiert werden");
 
-    const end = Math.min(id3 + Math.round((kbps * 1000 * WINDOW_SEC) / 8), MAX_BYTES) - 1;
+    const end = Math.min(id3 + Math.round((kbps * 1000 * windowSec) / 8), MAX_BYTES) - 1;
     const part = await fetchRange(audio, 0, end);
     const segs = (await transcribe(part.bytes, key)).filter((s) => s.text);
     if (segs.length < 3) throw new Error("Zu wenig Sprache erkannt");
@@ -247,7 +249,7 @@ export async function GET(request: Request) {
         firstWords: d.story != null ? segs[d.story].text.slice(0, 120) : null,
         reason: d.reason,
         model: d.model,
-        window: WINDOW_SEC,
+        window: windowSec,
         pv: PROMPT_VERSION,
         ...(d.warnings.length ? { warnings: d.warnings.map((w) => w.slice(0, 300)) } : {}),
         // Zum Nachprüfen im Elternbereich: Abschnitte mit Zeit und Einordnung

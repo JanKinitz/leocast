@@ -100,7 +100,7 @@ for (const p of [...podcasts, ...extra]) {
     const eps = (data.episodes || [])
       .filter((e) => e.audioUrl && isRealContent(e) && !(hide && hide.test(e.title)))
       .slice(0, PER_PODCAST)
-      .map((e) => ({ ...e, show: p.name }));
+      .map((e) => ({ ...e, show: p.name, night: p.category === "gutenacht" }));
     lists.push(eps);
     console.log(`${p.name}: ${eps.length} Folgen`);
   } catch (e) {
@@ -112,7 +112,9 @@ for (let i = 0; i < PER_PODCAST; i++) for (const l of lists) if (l[i]) queue.pus
 // Referenz-Folgen (von Eltern geprüft) zuerst, damit Verbesserungen schnell messbar sind
 const reference = JSON.parse(readFileSync(new URL("../lib/reference-markers.json", import.meta.url), "utf8"));
 const isRef = (e) => reference.some((r) => e.title.includes(r.title));
-queue.sort((a, b) => Number(isRef(b)) - Number(isRef(a)));
+// Reihenfolge: Referenz-Folgen, dann Gute-Nacht-Podcasts (dort lohnt der Sprung), dann der Rest
+const rank = (e) => (isRef(e) ? 0 : e.night ? 1 : 2);
+queue.sort((a, b) => rank(a) - rank(b));
 
 const started = Date.now();
 let analysed = 0;
@@ -126,7 +128,16 @@ for (let qi = 0; qi < queue.length; qi++) {
   const retryNoStory = known && !known.error && (known.pv || 0) < PROMPT_VERSION;
   if (known && !retryNoStory && (!known.error || (/MP3/.test(known.error) && Date.now() - known.at < RETRY_ERRORS_AFTER))) continue;
 
-  const q = new URLSearchParams({ v: "2", audio: ep.audioUrl, title: ep.title, show: ep.show, debug: "1", r: String(Date.now()) });
+  // Wissens-Podcasts: nur die ersten 2,5 Minuten (Werbung erkennen), einen Sprung zur Geschichte gibt es dort nicht
+  const q = new URLSearchParams({
+    v: "2",
+    audio: ep.audioUrl,
+    title: ep.title,
+    show: ep.show,
+    debug: "1",
+    window: ep.night ? "480" : "150",
+    r: String(Date.now()),
+  });
   const { ok, status, data } = await json(`${BASE}/api/analyze?${q}`);
   if (status === 429) {
     // Stunden-Kontingent: 10 Minuten warten und dieselbe Folge erneut versuchen
