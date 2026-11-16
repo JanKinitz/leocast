@@ -123,6 +123,9 @@ for (const p of [...podcasts, ...extra]) {
     console.log(`${p.name}: Feed-Fehler ${e.message}`);
   }
 }
+save();
+publish();
+
 const queue = [];
 for (let i = 0; i < PER_PODCAST; i++) for (const l of lists) if (l[i]) queue.push(l[i]);
 // Referenz-Folgen (von Eltern geprüft) zuerst, damit Verbesserungen schnell messbar sind
