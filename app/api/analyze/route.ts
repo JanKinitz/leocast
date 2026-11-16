@@ -131,7 +131,9 @@ async function decide(segs: Seg[], key: string): Promise<{ content: number; stor
 
 export async function GET(request: Request) {
   const params = new URL(request.url).searchParams;
-  const key = process.env.GROQ_API_KEY;
+  // Name der Variablen bei Vercel: GROQ_API_KEY (andere Schreibweisen werden auch akzeptiert)
+  const key =
+    process.env.GROQ_API_KEY || process.env.GROQ || process.env.groq || process.env.GROG || process.env.grog || process.env.Groq || process.env.Grog;
   if (params.get("check")) return Response.json({ configured: Boolean(key) }, { headers: { "Cache-Control": "no-store" } });
 
   const audio = params.get("audio") || "";
