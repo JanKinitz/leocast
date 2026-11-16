@@ -97,7 +97,8 @@ for (const ep of queue) {
   if (Date.now() - started > MAX_RUNTIME_MS) break;
   const h = hashUrl(ep.audioUrl);
   const known = index.entries[h];
-  if (known && (!known.error || Date.now() - known.at < RETRY_ERRORS_AFTER)) continue;
+  // Fehler erneut versuchen – außer bei Folgen, die grundsätzlich nicht gehen (kein MP3)
+  if (known && (!known.error || (/MP3/.test(known.error) && Date.now() - known.at < RETRY_ERRORS_AFTER))) continue;
 
   const q = new URLSearchParams({ v: "2", audio: ep.audioUrl, title: ep.title, show: ep.show, debug: "1", r: String(Date.now()) });
   const { ok, status, data } = await json(`${BASE}/api/analyze?${q}`);

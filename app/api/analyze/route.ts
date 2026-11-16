@@ -112,12 +112,11 @@ async function decide(segs: Seg[], key: string, title: string, show: string): Pr
     Boolean,
   ) as string[];
   let limited = 0;
-  let lastError = "";
+  const errors: string[] = [];
   for (const model of models) {
     const body: Record<string, unknown> = {
       model,
       temperature: 0,
-      response_format: { type: "json_object" },
       messages: [
         { role: "system", content: PROMPT },
         { role: "user", content: user },
@@ -131,26 +130,29 @@ async function decide(segs: Seg[], key: string, title: string, show: string): Pr
     });
     if (!res.ok) {
       if (res.status === 429) limited++;
-      lastError = `${model}: ${res.status} ${(await res.text()).slice(0, 120)}`;
+      errors.push(`${model}: ${res.status} ${(await res.text()).slice(0, 100)}`);
       continue;
     }
     const data = await res.json();
     let out: { labels?: string; reason?: string } = {};
+    const text: string = data.choices?.[0]?.message?.content || "";
+    // JSON aus der Antwort herauslösen (manche Modelle schreiben Text oder Denkblöcke drumherum)
+    const json = text.replace(/<think>[\s\S]*?<\/think>/g, "").match(/\{[\s\S]*\}/)?.[0];
     try {
-      out = JSON.parse(data.choices?.[0]?.message?.content || "{}");
+      out = JSON.parse(json || "{}");
     } catch {
-      lastError = `${model}: keine gültige Antwort`;
+      errors.push(`${model}: keine gültige Antwort`);
       continue;
     }
     let labels = String(out.labels || "").toUpperCase().replace(/[^WIEGO]/g, "");
     if (labels.length < segs.length * 0.8) {
-      lastError = `${model}: ${labels.length} von ${segs.length} Abschnitten bewertet`;
+      errors.push(`${model}: ${labels.length} von ${segs.length} Abschnitten bewertet`);
       continue;
     }
     labels = labels.slice(0, segs.length).padEnd(segs.length, labels[labels.length - 1] || "G");
     return { ...fromLabels(labels, segs), reason: String(out.reason || "").slice(0, 200), labels, model };
   }
-  throw Object.assign(new Error(`Sprachmodell nicht erreichbar (${lastError})`), {
+  throw Object.assign(new Error(`Sprachmodell nicht erreichbar (${errors.join(" | ")})`), {
     status: limited === models.length ? 429 : 502,
   });
 }
