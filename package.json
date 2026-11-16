@@ -1,0 +1,24 @@
+{
+  "name": "leocast",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Leocast – kindgerechte PWA für Kindermusik (Spotify) und Kinderpodcasts (offene Feeds, offline)",
+  "scripts": {
+    "dev": "next dev --hostname 127.0.0.1 --port 3000",
+    "build": "next build",
+    "start": "next start",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "fast-xml-parser": "^4.5.0",
+    "next": "^15.3.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "typescript": "^5.7.2"
+  }
+}
