@@ -219,7 +219,8 @@ export function getMarkers(item: MediaItem): Promise<Markers | null> {
   const cached = read<Markers | null>(key(item.id), null);
   const offline = typeof navigator !== "undefined" && !navigator.onLine;
   // Ergebnisse ohne KI nur behalten, bis die KI-Analyse klappt
-  if (cached && (cached.source === "ki" || offline)) return Promise.resolve(cached);
+  // Von Eltern korrigiert oder offline: so lassen. Sonst hat die (neuere) Vorab-Analyse Vorrang.
+  if (cached && (cached.corrected || offline)) return Promise.resolve(cached);
   const manual = (): Markers | null => {
     const m = item.podcastId ? getManualIntro(item.podcastId) : null;
     return m ? { story: m, content: 0, totalSec: null, absolute: true, source: "eingestellt" } : null;
@@ -233,6 +234,7 @@ export function getMarkers(item: MediaItem): Promise<Markers | null> {
       const reanalyse = read<number | null>(nonceKey(item.id), null);
       m =
         (reanalyse ? null : await fromIndex(item)) ||
+        (cached?.source === "ki" ? cached : null) ||
         (await fromAi(item)) ||
         cached ||
         (await fromTranscript(item));
