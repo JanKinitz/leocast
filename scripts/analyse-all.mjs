@@ -9,7 +9,7 @@ import { execSync } from "node:child_process";
 
 const BASE = process.env.LEOCAST_URL || "https://leocast.vercel.app";
 const OUT = process.argv[2] || "markers-out";
-const PER_PODCAST = Number(process.env.PER_PODCAST || 15);
+const PER_PODCAST = Number(process.env.PER_PODCAST || 60); // so viele Folgen zeigt die App je Podcast
 // Kostenloses Groq-Kontingent: max. 2 Stunden Audio pro Stunde, 8 Minuten pro Folge → höchstens 15 Folgen pro Stunde
 const PAUSE_MS = Number(process.env.PAUSE_MS || 245_000);
 const MAX_RUNTIME_MS = Number(process.env.MAX_RUNTIME_MS || 5 * 60 * 60 * 1000);
@@ -67,8 +67,22 @@ for (const [h, e] of Object.entries(index.entries)) {
   }
 }
 
+let stats = null;
 const save = () => {
   index.updated = new Date().toISOString();
+  // Übersicht je Podcast für den Statusbericht
+  if (stats)
+    index.stats = stats.map((p) => {
+      const done = p.hashes.map((h) => index.entries[h]).filter((e) => e && !e.error && (e.pv || 0) >= PROMPT_VERSION);
+      return {
+        name: p.name,
+        category: p.category,
+        total: p.hashes.length,
+        analysed: done.length,
+        withStory: done.filter((e) => e.storyStart != null).length,
+        errors: p.hashes.filter((h) => index.entries[h]?.error).length,
+      };
+    });
   writeFileSync(indexFile, JSON.stringify(index));
 };
 // Zwischendurch veröffentlichen, damit die App neue Sprungmarken nicht erst nach Stunden bekommt
@@ -90,6 +104,7 @@ publish();
 
 // Warteschlange: pro Podcast die neuesten Folgen, abwechselnd zwischen den Podcasts
 const lists = [];
+stats = [];
 for (const p of [...podcasts, ...extra]) {
   try {
     const url = await feedUrlFor(p);
@@ -102,6 +117,7 @@ for (const p of [...podcasts, ...extra]) {
       .slice(0, PER_PODCAST)
       .map((e) => ({ ...e, show: p.name, night: p.category === "gutenacht" }));
     lists.push(eps);
+    stats.push({ id: p.id, name: p.name, category: p.category, hashes: eps.map((e) => hashUrl(e.audioUrl)) });
     console.log(`${p.name}: ${eps.length} Folgen`);
   } catch (e) {
     console.log(`${p.name}: Feed-Fehler ${e.message}`);
