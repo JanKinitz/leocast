@@ -53,6 +53,18 @@ async function feedUrlFor(p) {
 mkdirSync(join(OUT, "segments"), { recursive: true });
 const indexFile = join(OUT, "index.json");
 const index = existsSync(indexFile) ? JSON.parse(readFileSync(indexFile, "utf8")) : { entries: {} };
+// Regel „nur mit Entspannung springen“ auch auf ältere Ergebnisse anwenden (aus den gespeicherten Abschnitten)
+for (const [h, e] of Object.entries(index.entries)) {
+  const file = join(OUT, "segments", `${h}.json`);
+  if (e.error || e.storyStart == null || !existsSync(file)) continue;
+  const segs = JSON.parse(readFileSync(file, "utf8"));
+  const before = segs.filter((x) => x.t >= (e.contentStart || 0) && x.t < e.storyStart);
+  if (!before.some((x) => x.l === "E")) {
+    console.log(`Kein Sprung mehr (keine Entspannung): ${e.title}`);
+    e.storyStart = null;
+  }
+}
+
 const save = () => {
   index.updated = new Date().toISOString();
   writeFileSync(indexFile, JSON.stringify(index));

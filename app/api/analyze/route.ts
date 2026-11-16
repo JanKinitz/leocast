@@ -198,9 +198,10 @@ function fromLabels(labels: string, segs: Seg[]): { content: number; story: numb
       break;
     }
   }
-  // Kurzes Intro ohne Entspannung (z. B. Erkennungsmelodie) muss nicht übersprungen werden
+  // Nur springen, wenn vor der Geschichte eine Entspannung kommt (Gute-Nacht-Podcasts).
+  // Bei Wissens-Podcasts (CheckPod, Anna, Ole) bleibt das Intro, wie es ist.
   const hasRelax = story != null && labels.slice(content, story).includes("E");
-  if (story != null && segs[story].start - segs[content].start < (hasRelax ? 20 : 45)) story = null;
+  if (story != null && (!hasRelax || segs[story].start - segs[content].start < 20)) story = null;
   return { content, story };
 }
 
