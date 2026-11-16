@@ -1,7 +1,6 @@
 // Abgleich zwischen Geräten: ein Gerät schickt seinen Stand, der Server führt ihn mit dem gespeicherten zusammen
-// und gibt das Ergebnis zurück. Gespeichert wird in Vercel Blob unter einem Pfad, der nur aus dem
-// festen Pfad (alle Geräte der Familie). Geschrieben wird nur, wenn sich wirklich etwas geändert hat Geschrieben wird nur, wenn sich wirklich etwas geändert hat
-// (kostenloses Kontingent: 2.000 Schreibvorgänge im Monat).
+// und gibt das Ergebnis zurück. Gespeichert wird in Vercel Blob unter einem festen Pfad (alle Geräte der Familie).
+// Geschrieben wird nur, wenn sich wirklich etwas geändert hat (kostenloses Kontingent: 2.000 Schreibvorgänge im Monat).
 import { createHash } from "node:crypto";
 import { head, put } from "@vercel/blob";
 import { analyseList, emptyState, mergeStates, normalizeCode, sameState, type SyncState } from "@/lib/syncCore";
