@@ -84,8 +84,8 @@ async function transcribe(audio: Uint8Array, key: string): Promise<Seg[]> {
   return (data.segments || []).map((s: Seg) => ({ start: s.start, end: s.end, text: String(s.text).trim() }));
 }
 
-const PROMPT = `Du bekommst den Anfang einer Kinder-Podcast-Folge (automatisch abgeschrieben) als nummerierte Abschnitte
-mit Zeitangabe, dazu den Titel der Folge. Ordne JEDEM Abschnitt genau einen Buchstaben zu:
+const PROMPT = `Du bekommst den Anfang einer Kinder-Podcast-Folge (automatisch abgeschrieben) als nummerierte Abschnitte,
+dazu den Titel der Folge. Teile die Abschnitte in zusammenhängende Blöcke ein. Jeder Block hat einen Typ:
 W = eingespielte Fremdwerbung (Spots für Produkte, Firmen, Apps, Versicherungen, andere Podcasts; oft andere Stimme)
 I = Vorspann der Sendung: Begrüßung, Vorstellen, Erkennungsmelodie, wer sich die Folge gewünscht hat, Grüße an Kinder,
     Wünsche-Aufruf, Eigenwerbung (werbefrei hören, Unterstützer, Abo, Bewertung), Hinweise
@@ -97,8 +97,9 @@ G = die eigentliche Geschichte bzw. der eigentliche Inhalt: erzählte Handlung m
 O = Abspann (Verabschiedung, Gute-Nacht-Wünsche am Ende)
 Wichtig: Eine Begleitfigur oder ein Ritual, das in jeder Folge gleich ist, ist noch NICHT die Geschichte.
 Die Geschichte beginnt erst dort, wo erzählt wird, was in DIESER Folge passiert.
-Antworte nur mit JSON: {"labels": "<ein Buchstabe pro Abschnitt, in Reihenfolge, ohne Leerzeichen>",
-"reason": "<ein kurzer Satz, woran du den Beginn der Geschichte erkennst>"}`;
+Antworte nur mit kurzem JSON. Für jeden Block nur die Nummer des ERSTEN Abschnitts und den Typ, in Reihenfolge, z. B.:
+{"blocks":[{"from":0,"type":"W"},{"from":4,"type":"I"},{"from":11,"type":"E"},{"from":27,"type":"G"}],
+"reason":"<ein kurzer Satz, woran du den Beginn der Geschichte erkennst>"}`;
 
 type Decision = { content: number; story: number | null; reason: string; labels: string; model: string; warnings: string[] };
 
@@ -122,7 +123,7 @@ async function decide(segs: Seg[], key: string, title: string, show: string): Pr
         { role: "user", content: user },
       ],
     };
-    body.max_completion_tokens = 6000;
+    body.max_completion_tokens = 3000;
     if (model.startsWith("openai/gpt-oss")) body.reasoning_effort = "low";
     if (model.startsWith("qwen/")) body.reasoning_effort = "none";
     const res = await fetch(`${GROQ}/chat/completions`, {
@@ -136,7 +137,7 @@ async function decide(segs: Seg[], key: string, title: string, show: string): Pr
       continue;
     }
     const data = await res.json();
-    let out: { labels?: string | string[]; reason?: string } = {};
+    let out: { blocks?: { from?: number; type?: string }[]; reason?: string } = {};
     const choice = data.choices?.[0];
     const text: string = choice?.message?.content || "";
     // JSON aus der Antwort herauslösen (manche Modelle schreiben Text oder Denkblöcke drumherum)
@@ -147,15 +148,20 @@ async function decide(segs: Seg[], key: string, title: string, show: string): Pr
       errors.push(`${model}: keine gültige Antwort (${choice?.finish_reason}) ${text.slice(0, 160)}`);
       continue;
     }
-    const raw = Array.isArray(out.labels) ? out.labels.join("") : out.labels || "";
-    let labels = String(raw).toUpperCase().replace(/[^WIEGO]/g, "");
-    if (labels.length < segs.length * 0.8) {
-      errors.push(
-        `${model}: ${labels.length} von ${segs.length} Abschnitten bewertet (${choice?.finish_reason}) ${text.slice(0, 160)}`,
-      );
+    // Blöcke in einen Buchstaben pro Abschnitt umwandeln
+    const blocks = (Array.isArray(out.blocks) ? out.blocks : [])
+      .map((b) => ({ from: Number(b.from), type: String(b.type || "").toUpperCase().slice(0, 1) }))
+      .filter((b) => Number.isInteger(b.from) && b.from >= 0 && b.from < segs.length && "WIEGO".includes(b.type) && b.type)
+      .sort((a, b) => a.from - b.from);
+    if (!blocks.length) {
+      errors.push(`${model}: keine Blöcke (${choice?.finish_reason}) ${text.slice(0, 160)}`);
       continue;
     }
-    labels = labels.slice(0, segs.length).padEnd(segs.length, labels[labels.length - 1] || "G");
+    let labels = "";
+    for (let i = 0; i < segs.length; i++) {
+      const b = [...blocks].reverse().find((x) => x.from <= i) || blocks[0];
+      labels += b.type;
+    }
     return { ...fromLabels(labels, segs), reason: String(out.reason || "").slice(0, 200), labels, model, warnings: errors };
   }
   throw Object.assign(new Error(`Sprachmodell nicht erreichbar (${errors.join(" | ")})`), {
