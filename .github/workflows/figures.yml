@@ -3,6 +3,9 @@ name: Figuren-Fotos
 on:
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   shots:
     runs-on: ubuntu-latest
@@ -21,7 +24,13 @@ jobs:
           npx next start -H 127.0.0.1 -p 3000 &
           sleep 6
           node scripts/screenshot-figures.mjs
-      - uses: actions/upload-artifact@v4
-        with:
-          name: figuren
-          path: figuren-*.png
+      - name: Fotos in den Zweig „fotos“ legen
+        run: |
+          mkdir fotos && mv figuren-*.png fotos/
+          cd fotos
+          printf '{ "git": { "deploymentEnabled": false } }\n' > vercel.json
+          git init -q -b fotos
+          git config user.name leocast-bot
+          git config user.email leocast-bot@users.noreply.github.com
+          git add -A && git commit -qm "Figuren-Fotos"
+          git push -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" fotos
