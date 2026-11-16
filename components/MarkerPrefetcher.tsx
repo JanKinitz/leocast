@@ -4,7 +4,7 @@
 // 1. Vorab-Analysen aus GitHub (sofort)  2. Was dort fehlt (z. B. neue Folgen, eigene Podcasts): langsam selbst
 // analysieren lassen – eine Folge pro gut einer Minute, wegen des kostenlosen KI-Kontingents.
 import { useEffect } from "react";
-import { allPodcasts } from "@/lib/library";
+import { PODCASTS, allPodcasts } from "@/lib/library";
 import { episodeItem, loadFeed } from "@/lib/podcasts";
 import { aiPaused, getMarkers, hasMarkers, inIndex, loadMarkerIndex } from "@/lib/markers";
 import { useStoreVersion } from "@/lib/store";
@@ -29,7 +29,9 @@ async function run(isAlive: () => boolean) {
     await sleep(8000);
     await loadMarkerIndex();
     const lists = [];
-    for (const source of allPodcasts()) {
+    // Die festen Podcasts analysiert GitHub vorab – hier nur selbst hinzugefügte, damit das Kontingent reicht
+    const builtIn = new Set(PODCASTS.map((p) => p.id));
+    for (const source of allPodcasts().filter((p) => !builtIn.has(p.id))) {
       try {
         const feed = await loadFeed(source);
         lists.push(feed.episodes.slice(0, PER_PODCAST).map((e) => episodeItem(e, source)));
