@@ -2,7 +2,7 @@
 
 // Elternbereich: KI-Analysen nachprüfen und bei Bedarf den Beginn der Geschichte von Hand setzen.
 import { useEffect, useState } from "react";
-import { analysedEpisodes, forgetMarkers, fmtMinSec, setStoryStart, type Markers } from "@/lib/markers";
+import { analysedEpisodes, forgetMarkers, fmtMinSec, loadSegments, setStoryStart, type Markers } from "@/lib/markers";
 import { useStoreVersion } from "@/lib/store";
 
 const LABEL: Record<string, string> = {
@@ -17,6 +17,15 @@ export default function AnalysisPanel() {
   const version = useStoreVersion();
   const [list, setList] = useState<Markers[]>([]);
   const [open, setOpen] = useState<string | null>(null);
+  const [loaded, setLoaded] = useState<Record<string, Markers["segments"]>>({});
+  const toggle = async (m: Markers) => {
+    const id = m.id || null;
+    setOpen(open === id ? null : id);
+    if (id && !m.segments && m.hash && !loaded[id]) {
+      const segs = await loadSegments(m.hash);
+      if (segs) setLoaded((prev) => ({ ...prev, [id]: segs }));
+    }
+  };
   useEffect(() => setList(analysedEpisodes()), [version]);
 
   if (!list.length)
@@ -37,7 +46,7 @@ export default function AnalysisPanel() {
       <ul className="ana-list">
         {list.map((m) => (
           <li key={m.id}>
-            <button className="ana-head" onClick={() => setOpen(open === m.id ? null : m.id || null)}>
+            <button className="ana-head" onClick={() => toggle(m)}>
               <strong>{m.title}</strong>
               <span className="hint">
                 Werbung bis {fmtMinSec(m.content)} · Geschichte ab {fmtMinSec(m.story)}
@@ -47,8 +56,9 @@ export default function AnalysisPanel() {
             {open === m.id && (
               <div className="ana-body">
                 {m.reason && <p className="hint">KI: {m.reason}</p>}
+                {!m.segments && !(m.id && loaded[m.id]) && <p className="hint">Lade Abschnitte …</p>}
                 <ol className="ana-segs">
-                  {m.segments?.map((s, i) => (
+                  {(m.segments || (m.id ? loaded[m.id] : undefined))?.map((s, i) => (
                     <li key={i} className={`seg seg-${s.l} ${m.story === s.t ? "story" : ""}`}>
                       <span className="seg-time">{fmtMinSec(s.t)}</span>
                       <span className="seg-label">{LABEL[s.l] || s.l}</span>

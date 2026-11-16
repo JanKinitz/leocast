@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import MarkerPrefetcher from "@/components/MarkerPrefetcher";
 import RegisterSW from "@/components/RegisterSW";
 import PlayerProvider from "@/components/PlayerProvider";
 import AppShell from "@/components/AppShell";
@@ -34,6 +35,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body>
         <RegisterSW />
+        <MarkerPrefetcher />
         <PlayerProvider>
           <AppShell>{children}</AppShell>
         </PlayerProvider>

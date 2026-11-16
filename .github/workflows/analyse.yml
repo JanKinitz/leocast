@@ -1,0 +1,44 @@
+name: Folgen vorab analysieren
+
+on:
+  schedule:
+    - cron: "17 */3 * * *" # alle 3 Stunden
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: analyse
+  cancel-in-progress: false
+
+jobs:
+  analyse:
+    runs-on: ubuntu-latest
+    timeout-minutes: 330
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Zweig „markers“ holen
+        run: |
+          if git ls-remote --exit-code --heads origin markers >/dev/null; then
+            git fetch origin markers
+            git worktree add out origin/markers
+          else
+            mkdir out
+          fi
+      - name: Analysieren (speichert zwischendurch)
+        run: node scripts/analyse-all.mjs out
+      - name: Ergebnisse veröffentlichen
+        if: always()
+        run: |
+          cd out
+          if [ ! -d .git ] && [ ! -f .git ]; then git init -q -b markers && git remote add origin "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git"; fi
+          git config user.name "leocast-bot"
+          git config user.email "leocast-bot@users.noreply.github.com"
+          git add -A
+          git diff --cached --quiet && exit 0
+          git commit -qm "Sprungmarken aktualisieren"
+          git push origin HEAD:markers

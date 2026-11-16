@@ -2,11 +2,11 @@
 // und ein Sprachmodell bestimmen lassen, wo Werbung endet und wo die eigentliche Geschichte beginnt.
 // Zeiten beziehen sich auf die tatsächliche Audiodatei (mit Werbung). Ergebnis wird 30 Tage im CDN gespeichert.
 export const runtime = "nodejs";
-export const maxDuration = 60;
+export const maxDuration = 120;
 // Aus Frankfurt laden, damit die eingefügte Werbung der auf den Geräten in Deutschland entspricht
 export const preferredRegion = "fra1";
 
-const WINDOW_SEC = 600; // analysiert werden die ersten 10 Minuten
+const WINDOW_SEC = 420; // analysiert werden die ersten 7 Minuten (spart kostenloses Kontingent)
 const MAX_BYTES = 24 * 1024 * 1024; // Groq (kostenlos): Dateien bis 25 MB
 const GROQ = "https://api.groq.com/openai/v1";
 const UA = "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Mobile Safari/537.36";
@@ -76,7 +76,10 @@ async function transcribe(audio: Uint8Array, key: string): Promise<Seg[]> {
     headers: { Authorization: `Bearer ${key}` },
     body: form,
   });
-  if (!res.ok) throw new Error(`Abschreiben fehlgeschlagen (${res.status}): ${(await res.text()).slice(0, 200)}`);
+  if (!res.ok)
+    throw Object.assign(new Error(`Abschreiben fehlgeschlagen (${res.status}): ${(await res.text()).slice(0, 200)}`), {
+      status: res.status === 429 ? 429 : 502,
+    });
   const data = await res.json();
   return (data.segments || []).map((s: Seg) => ({ start: s.start, end: s.end, text: String(s.text).trim() }));
 }
@@ -101,10 +104,14 @@ type Decision = { content: number; story: number | null; reason: string; labels:
 
 async function decide(segs: Seg[], key: string, title: string, show: string): Promise<Decision> {
   const lines = segs
-    .map((s, i) => `[${i}] ${Math.floor(s.start / 60)}:${String(Math.floor(s.start % 60)).padStart(2, "0")} ${s.text}`)
+    .map((s, i) => `[${i}] ${s.text}`)
     .join("\n");
   const user = `Sendung: ${show || "unbekannt"}\nTitel der Folge: ${title || "unbekannt"}\nAnzahl Abschnitte: ${segs.length}\n\n${lines}`;
-  const models = [process.env.GROQ_LLM_MODEL, "openai/gpt-oss-120b", "llama-3.3-70b-versatile"].filter(Boolean) as string[];
+  // Jedes Modell hat ein eigenes kostenloses Tageskontingent: ist eins aufgebraucht, das nächste nehmen
+  const models = [process.env.GROQ_LLM_MODEL, "openai/gpt-oss-120b", "qwen/qwen3.8-27b", "openai/gpt-oss-20b"].filter(
+    Boolean,
+  ) as string[];
+  let limited = 0;
   let lastError = "";
   for (const model of models) {
     const body: Record<string, unknown> = {
@@ -116,13 +123,14 @@ async function decide(segs: Seg[], key: string, title: string, show: string): Pr
         { role: "user", content: user },
       ],
     };
-    if (model.startsWith("openai/gpt-oss")) body.reasoning_effort = "high";
+    if (model.startsWith("openai/gpt-oss")) body.reasoning_effort = "medium";
     const res = await fetch(`${GROQ}/chat/completions`, {
       method: "POST",
       headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
     if (!res.ok) {
+      if (res.status === 429) limited++;
       lastError = `${model}: ${res.status} ${(await res.text()).slice(0, 120)}`;
       continue;
     }
@@ -142,7 +150,9 @@ async function decide(segs: Seg[], key: string, title: string, show: string): Pr
     labels = labels.slice(0, segs.length).padEnd(segs.length, labels[labels.length - 1] || "G");
     return { ...fromLabels(labels, segs), reason: String(out.reason || "").slice(0, 200), labels, model };
   }
-  throw new Error(`Sprachmodell nicht erreichbar (${lastError})`);
+  throw Object.assign(new Error(`Sprachmodell nicht erreichbar (${lastError})`), {
+    status: limited === models.length ? 429 : 502,
+  });
 }
 
 /** Werbung endet beim ersten Nicht-W; Geschichte = erster G-Abschnitt, nach dem es überwiegend mit G weitergeht */
@@ -212,6 +222,7 @@ export async function GET(request: Request) {
       { headers: { "Cache-Control": "public, s-maxage=2592000, stale-while-revalidate=2592000" } },
     );
   } catch (e) {
-    return Response.json({ error: (e as Error).message }, { status: 502, headers: noStore });
+    const status = (e as { status?: number }).status || 502;
+    return Response.json({ error: (e as Error).message }, { status, headers: noStore });
   }
 }

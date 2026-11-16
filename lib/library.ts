@@ -2,6 +2,7 @@
 // Später pflegen Eltern das im Elternbereich (und es wird zwischen den Geräten abgeglichen).
 
 import { read, write } from "./store";
+import defaults from "./default-podcasts.json";
 
 export type MediaKind = "episode" | "track";
 
@@ -46,51 +47,10 @@ export type PodcastSource = {
   image?: string;
 };
 
-export const PODCASTS: PodcastSource[] = [
-  {
-    id: "checkpod",
-    name: "CheckPod",
-    search: "CheckPod Checker Tobi",
-    feedUrl: "https://feeds.br.de/checkpod-der-podcast-mit-checker-tobi/feed.xml",
-    color: "#1f7a63",
-    category: "podcasts",
-  },
-  {
-    id: "anna",
-    name: "Anna und die wilden Tiere",
-    search: "Anna und die wilden Tiere",
-    color: "#5f7d1c",
-    category: "podcasts",
-  },
-  {
-    id: "ole",
-    name: "Ole schaut hin",
-    search: "Ole schaut hin",
-    color: "#a0522d",
-    category: "podcasts",
-  },
-  {
-    id: "laluna",
-    name: "LALUNA Traumreisen",
-    search: "LALUNA Traumreisen",
-    feedUrl: "https://cdn.audiorella.com/podcasts/1786-laluna-traumreisen-zum-einschlafen/feed.rss",
-    skipAds: true,
-    color: "#43479a",
-    category: "gutenacht",
-  },
-  {
-    id: "bleib-entspannt",
-    name: "Bleib entspannt!",
-    search: "Bleib entspannt Meditations-Podcast",
-    feedUrl:
-      "https://cdn.audiorella.com/podcasts/1760-bleib-entspannt-der-meditations-podcast-magische-momente-fur-kinder-eltern/feed.rss",
-    // Folgen nur für Erwachsene ausblenden („für Erwachsene & Kinder“ bleibt)
-    hideTitle: /^(?!.*kinder).*erwachsene/i,
-    skipAds: true,
-    color: "#2d6177",
-    category: "gutenacht",
-  },
-];
+// Feste Startbibliothek (auch vom Analyse-Skript in GitHub Actions gelesen)
+export const PODCASTS: PodcastSource[] = (defaults as (Omit<PodcastSource, "hideTitle"> & { hideTitle?: string })[]).map(
+  (p) => ({ ...p, hideTitle: p.hideTitle ? new RegExp(p.hideTitle, "i") : undefined }),
+);
 
 // ---- Von Eltern hinzugefügte und ausgeblendete Podcasts (auf dem Gerät gespeichert) ----
 export type CustomPodcast = {
