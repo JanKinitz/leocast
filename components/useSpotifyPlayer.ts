@@ -1,6 +1,6 @@
 "use client";
 
-// Lädt das Spotify Web Playback SDK und macht die App selbst zu einem Spotify-Connect-Gerät.
+// Lädt das Spotify Web Playback SDK und macht Leocast selbst zu einem Spotify-Connect-Gerät.
 import { useCallback, useEffect, useRef, useState } from "react";
 import { getAccessToken, playUri } from "@/lib/spotify";
 import { log } from "@/lib/diagnostics";
@@ -12,15 +12,7 @@ declare global {
   }
 }
 
-export type PlayerState = {
-  paused: boolean;
-  position: number;
-  duration: number;
-  trackName?: string;
-  trackUri?: string;
-  image?: string;
-  artist?: string;
-};
+export type SdkState = { paused: boolean; position: number; duration: number; uri?: string };
 
 let sdkPromise: Promise<void> | null = null;
 
@@ -37,13 +29,14 @@ function loadSdk(): Promise<void> {
   return sdkPromise;
 }
 
-export function useSpotifyPlayer(enabled: boolean) {
+export function useSpotifyPlayer(enabled: boolean, onState: (s: SdkState) => void) {
   const playerRef = useRef<any>(null);
   const [deviceId, setDeviceId] = useState<string | null>(null);
-  const [state, setState] = useState<PlayerState | null>(null);
   const [error, setError] = useState<string | null>(null);
   const activatedRef = useRef(false);
-  const stopAtEndRef = useRef<string | null>(null);
+  const wantedUriRef = useRef<string | null>(null);
+  const onStateRef = useRef(onState);
+  onStateRef.current = onState;
 
   useEffect(() => {
     if (!enabled) return;
@@ -60,45 +53,29 @@ export function useSpotifyPlayer(enabled: boolean) {
       player.addListener("ready", ({ device_id }: { device_id: string }) => {
         setDeviceId(device_id);
         setError(null);
-        log("ok", `Web Playback SDK bereit (Gerät ${device_id.slice(0, 8)}…)`);
+        log("ok", "Spotify-Player bereit");
       });
-      player.addListener("not_ready", () => {
-        setDeviceId(null);
-        log("info", "Web Playback SDK nicht mehr bereit");
-      });
-      const onErr = (kind: string) => ({ message }: { message: string }) => {
-        const text = `${kind}: ${message}`;
-        setError(text);
-        log("error", text);
-      };
-      player.addListener("initialization_error", onErr("Initialisierung (DRM/Browser)"));
+      player.addListener("not_ready", () => setDeviceId(null));
+      const onErr =
+        (kind: string) =>
+        ({ message }: { message: string }) => {
+          setError(`${kind}: ${message}`);
+          log("error", `Spotify ${kind}: ${message}`);
+        };
+      player.addListener("initialization_error", onErr("Start"));
       player.addListener("authentication_error", onErr("Anmeldung"));
-      player.addListener("account_error", onErr("Konto (Premium nötig)"));
+      player.addListener("account_error", onErr("Konto"));
       player.addListener("playback_error", onErr("Wiedergabe"));
-      player.addListener("autoplay_failed", () => {
-        log("error", "Autoplay vom Browser blockiert – bitte noch einmal auf Play tippen");
-      });
       player.addListener("player_state_changed", (s: any) => {
         if (!s) return;
-        const cur = s.track_window?.current_track;
-        setState({
-          paused: s.paused,
-          position: s.position,
-          duration: s.duration,
-          trackName: cur?.name,
-          trackUri: cur?.uri,
-          image: cur?.album?.images?.[0]?.url,
-          artist: (cur?.artists || []).map((a: any) => a.name).join(", "),
-        });
-        // Wiedergabe am Ende des gewählten Titels anhalten (kein Autoplay mit ähnlichen Titeln)
-        if (stopAtEndRef.current && cur?.uri && cur.uri !== stopAtEndRef.current && !s.paused) {
+        const uri = s.track_window?.current_track?.uri;
+        // Kein Autoplay: läuft etwas anderes als der gewählte Titel, sofort anhalten
+        if (wantedUriRef.current && uri && uri !== wantedUriRef.current && !s.paused) {
           player.pause();
-          log("info", "Anderer Titel gestartet – Leocast hat angehalten (kein Autoplay)");
         }
+        onStateRef.current({ paused: s.paused, position: s.position / 1000, duration: s.duration / 1000, uri });
       });
-      player.connect().then((ok: boolean) => {
-        log(ok ? "info" : "error", ok ? "Verbinde mit Spotify…" : "Verbindung zum SDK fehlgeschlagen");
-      });
+      player.connect();
       playerRef.current = player;
     });
     return () => {
@@ -109,12 +86,8 @@ export function useSpotifyPlayer(enabled: boolean) {
   const play = useCallback(
     async (uri: string) => {
       const player = playerRef.current;
-      if (!player || !deviceId) {
-        setError("Player ist noch nicht bereit");
-        return;
-      }
+      if (!player || !deviceId) throw new Error("Spotify ist noch nicht bereit");
       if (!activatedRef.current) {
-        // Mobile Browser starten Audio nur nach einer Berührung
         try {
           await player.activateElement();
         } catch {
@@ -122,26 +95,13 @@ export function useSpotifyPlayer(enabled: boolean) {
         }
         activatedRef.current = true;
       }
-      try {
-        stopAtEndRef.current = uri;
-        await playUri(deviceId, uri);
-        log("ok", "Wiedergabe gestartet");
-      } catch (e: any) {
-        setError(e.message);
-        log("error", `Abspielen fehlgeschlagen: ${e.message}`);
-      }
+      wantedUriRef.current = uri;
+      await playUri(deviceId, uri);
     },
     [deviceId],
   );
 
-  const toggle = useCallback(() => playerRef.current?.togglePlay(), []);
-  const seekBy = useCallback(
-    (ms: number) => {
-      if (!state) return;
-      playerRef.current?.seek(Math.max(0, state.position + ms));
-    },
-    [state],
-  );
+  const sdk = useCallback(() => playerRef.current, []);
 
-  return { deviceId, state, error, play, toggle, seekBy };
+  return { ready: !!deviceId, error, play, sdk };
 }

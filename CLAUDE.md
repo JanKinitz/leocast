@@ -35,10 +35,24 @@ Kindgerechte PWA für unsere 7-jährige Tochter: Kindermusik aus Spotify und Kin
 - Redirect-URIs: `http://127.0.0.1:3000/callback` (lokal; `localhost` ist nicht erlaubt) und `https://<vercel-adresse>/callback`.
 - Endpunkte nach den Änderungen vom Feb. 2026: `/me/playlists`, `/playlists/{id}/items`, Einzelabrufe für Shows/Episoden.
 
-## Struktur (Prototyp)
+## Gestaltung
 
-- `app/page.tsx` – Login, Playlists, Wiedergabe (Web Playback SDK, `components/useSpotifyPlayer.ts`)
-- `app/podcast/page.tsx` – Feed laden, Folge offline speichern, abspielen (`lib/offline.ts`)
-- `app/api/feed/route.ts` – RSS holen und als JSON liefern
+- **Dunkles Design** (Abend/Einschlafen): Grund `#14172b`, Flächen `#1e2240`, Akzent gelb `#ffd43b` für Hauptknöpfe,
+  orange `#ff8a3d` für die aktive Navigation. Schrift Nunito.
+- Muster nach KiKA-App: Pillen-Leiste oben (Start · Ich), große Kacheln in wischbaren Reihen, Sendungs-Welt mit eigener
+  Farbe und rundem Logo, runder gelber Zurück-Knopf, Herz = Mag ich, Wolke = offline.
+- Player: Handy = Vollbild beim Abspielen (Android-Zurück schließt ihn) + kleiner Player unten; Tablet quer = Player
+  rechts dauerhaft; Tablet hochkant = Player unten dauerhaft. Umschaltung rein per CSS-Media-Query (`globals.css`).
+- Wireframes: https://claude.ai/artifact/GTBMHerutbdNW8tVrge5iL
+
+## Struktur
+
+- `app/page.tsx` Startseite · `app/sendung/[id]` Sendungs-Welt · `app/playlist/[id]` Spotify-Playlist ·
+  `app/ich` Mein Bereich · `app/eltern` Elternbereich (Rechenaufgabe; Schloss oben rechts 3 s halten)
+- `components/PlayerProvider.tsx` – ein Player für Podcast-Folgen (Audio-Element) und Spotify (Web Playback SDK),
+  Fortschritt, Schlaf-Timer, Media Session · `components/PlayerDock.tsx` – Mini- und Vollbild-Player
+- `lib/library.ts` – Podcasts und Kategorien (Feed-Adresse fest oder per Suche gefunden)
+- `lib/podcasts.ts` – Feeds laden/cachen · `lib/store.ts` – Mag ich, Fortschritt, Downloads (localStorage)
+- `app/api/feed` – RSS als JSON · `app/api/podcast-search` – Apple-Podcast-Verzeichnis (nur Treffer mit Feed)
 - `public/sw.js` – Service Worker (App offline, gespeicherte Folgen mit Range-Unterstützung)
-- `lib/diagnostics.ts` + `components/LogPanel.tsx` – Prüfprotokoll für Tests auf dem Gerät
+- `lib/diagnostics.ts` + `components/LogPanel.tsx` – Prüfprotokoll (im Elternbereich)

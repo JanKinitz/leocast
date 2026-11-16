@@ -8,8 +8,8 @@
   "display": "fullscreen",
   "display_override": ["fullscreen", "standalone"],
   "orientation": "any",
-  "background_color": "#fff7ec",
-  "theme_color": "#ff8a3d",
+  "background_color": "#14172b",
+  "theme_color": "#14172b",
   "lang": "de",
   "categories": ["kids", "music", "entertainment"],
   "icons": [

@@ -1,0 +1,87 @@
+// Bibliothek: welche Podcasts und Kategorien Leocast zeigt.
+// Später pflegen Eltern das im Elternbereich (und es wird zwischen den Geräten abgeglichen).
+
+export type MediaKind = "episode" | "track";
+
+/** Ein abspielbarer Eintrag (Podcast-Folge oder Spotify-Titel). */
+export type MediaItem = {
+  kind: MediaKind;
+  id: string;
+  title: string;
+  subtitle?: string;
+  image?: string;
+  color?: string;
+  durationSec?: number;
+  /** Podcast-Folge: Adresse der Audiodatei */
+  audioUrl?: string;
+  /** Spotify-Titel: spotify:track:… */
+  uri?: string;
+  podcastId?: string;
+  playlistId?: string;
+};
+
+export type PodcastSource = {
+  id: string;
+  name: string;
+  /** Suchbegriff für das Podcast-Verzeichnis, falls keine Feed-Adresse bekannt ist */
+  search: string;
+  feedUrl?: string;
+  /** Nur Folgen zeigen, deren Titel dieses Wort enthält */
+  titleFilter?: string;
+  color: string;
+  category: "podcasts" | "gutenacht";
+};
+
+export const PODCASTS: PodcastSource[] = [
+  {
+    id: "checkpod",
+    name: "CheckPod",
+    search: "CheckPod Checker Tobi",
+    feedUrl: "https://feeds.br.de/checkpod-der-podcast-mit-checker-tobi/feed.xml",
+    color: "#1f7a63",
+    category: "podcasts",
+  },
+  {
+    id: "anna",
+    name: "Anna und die wilden Tiere",
+    search: "Anna und die wilden Tiere",
+    color: "#5f7d1c",
+    category: "podcasts",
+  },
+  {
+    id: "ole",
+    name: "Ole schaut hin",
+    search: "Ole schaut hin",
+    color: "#a0522d",
+    category: "podcasts",
+  },
+  {
+    id: "laluna",
+    name: "LALUNA Traumreisen",
+    search: "LALUNA Traumreisen",
+    color: "#43479a",
+    category: "gutenacht",
+  },
+  {
+    id: "bleib-entspannt",
+    name: "Bleib entspannt!",
+    search: "Bleib entspannt Meditations-Podcast",
+    feedUrl:
+      "https://cdn.audiorella.com/podcasts/1760-bleib-entspannt-der-meditations-podcast-magische-momente-fur-kinder-eltern/feed.rss",
+    titleFilter: "Kinder",
+    color: "#2d6177",
+    category: "gutenacht",
+  },
+];
+
+export function podcastById(id: string): PodcastSource | undefined {
+  return PODCASTS.find((p) => p.id === id);
+}
+
+/** Farbe für Kacheln ohne Bild, aus dem Namen abgeleitet */
+export function colorFor(text: string): string {
+  const palette = ["#7c3aed", "#0f766e", "#b45309", "#be185d", "#1d4ed8", "#4d7c0f", "#9333ea", "#0e7490"];
+  let h = 0;
+  for (let i = 0; i < text.length; i++) h = (h * 31 + text.charCodeAt(i)) >>> 0;
+  return palette[h % palette.length];
+}

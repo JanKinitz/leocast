@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import RegisterSW from "@/components/RegisterSW";
+import PlayerProvider from "@/components/PlayerProvider";
+import AppShell from "@/components/AppShell";
 
 export const metadata: Metadata = {
   title: "Leocast",
@@ -13,7 +15,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#ff8a3d",
+  themeColor: "#14172b",
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
@@ -22,9 +24,19 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="de">
+      <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
+        <link
+          href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;800;900&display=swap"
+          rel="stylesheet"
+        />
+      </head>
       <body>
         <RegisterSW />
-        {children}
+        <PlayerProvider>
+          <AppShell>{children}</AppShell>
+        </PlayerProvider>
       </body>
     </html>
   );

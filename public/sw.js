@@ -4,10 +4,10 @@
 // - Gespeicherte Podcast-Folgen: aus dem Audio-Speicher, mit Unterstützung für Spulen (Range)
 // - /api/feed: zuerst Netz, sonst letzte Antwort
 
-const VERSION = "v1";
+const VERSION = "v2";
 const APP_CACHE = `leocast-app-${VERSION}`;
 const AUDIO_CACHE = "leocast-audio-v1";
-const SHELL = ["/", "/podcast", "/manifest.webmanifest", "/icons/icon-192.png", "/icons/icon-512.png"];
+const SHELL = ["/", "/ich", "/manifest.webmanifest", "/icons/icon-192.png", "/icons/icon-512.png"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(

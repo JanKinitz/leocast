@@ -1,0 +1,107 @@
+"use client";
+
+// Podcast-Feeds laden (über /api/feed), Feed-Adressen bei Bedarf über die Suche finden, offline aus dem Speicher.
+import type { MediaItem, PodcastSource } from "./library";
+import { read, write } from "./store";
+import { log } from "./diagnostics";
+
+export type Episode = {
+  guid: string;
+  title: string;
+  audioUrl: string;
+  image?: string;
+  durationSec?: number;
+  published?: string;
+};
+
+export type Feed = { title: string; image?: string; episodes: Episode[]; loadedAt: number };
+
+const feedKey = (id: string) => `leocast:feed:${id}`;
+const feedUrlKey = (id: string) => `leocast:feedurl:${id}`;
+
+export function cachedFeed(id: string): Feed | null {
+  return read<Feed | null>(feedKey(id), null);
+}
+
+function normalize(s: string) {
+  return s
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[^a-z0-9 ]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+async function resolveFeedUrl(source: PodcastSource): Promise<string> {
+  if (source.feedUrl) return source.feedUrl;
+  const cached = read<string | null>(feedUrlKey(source.id), null);
+  if (cached) return cached;
+  const res = await fetch(`/api/podcast-search?q=${encodeURIComponent(source.search)}`);
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || "Suche fehlgeschlagen");
+  const wanted = normalize(source.name);
+  const results: { name: string; feedUrl: string }[] = data.results || [];
+  const hit =
+    results.find((r) => normalize(r.name) === wanted) ||
+    results.find((r) => normalize(r.name).includes(wanted)) ||
+    results[0];
+  if (!hit) throw new Error(`Kein offener Feed für „${source.name}“ gefunden`);
+  write(feedUrlKey(source.id), hit.feedUrl);
+  log("ok", `Feed für „${source.name}“ gefunden: ${hit.name}`);
+  return hit.feedUrl;
+}
+
+const inflight = new Map<string, Promise<Feed>>();
+
+export function loadFeed(source: PodcastSource, maxAgeMs = 30 * 60 * 1000): Promise<Feed> {
+  const cached = cachedFeed(source.id);
+  if (cached && Date.now() - cached.loadedAt < maxAgeMs) return Promise.resolve(cached);
+  if (typeof navigator !== "undefined" && !navigator.onLine && cached) return Promise.resolve(cached);
+  const existing = inflight.get(source.id);
+  if (existing) return existing;
+  const p = (async () => {
+    try {
+      const url = await resolveFeedUrl(source);
+      const res = await fetch(`/api/feed?url=${encodeURIComponent(url)}`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || res.status);
+      let episodes: Episode[] = (data.episodes || []).map((e: any) => ({
+        guid: e.guid,
+        title: e.title,
+        audioUrl: e.audioUrl,
+        image: e.image || data.image,
+        durationSec: e.durationSec,
+        published: e.published,
+      }));
+      if (source.titleFilter) {
+        const f = source.titleFilter.toLowerCase();
+        episodes = episodes.filter((e) => e.title.toLowerCase().includes(f));
+      }
+      const feed: Feed = { title: data.title, image: data.image, episodes: episodes.slice(0, 60), loadedAt: Date.now() };
+      write(feedKey(source.id), feed);
+      return feed;
+    } catch (e) {
+      log("error", `Feed „${source.name}“: ${(e as Error).message}`);
+      if (cached) return cached;
+      throw e;
+    } finally {
+      inflight.delete(source.id);
+    }
+  })();
+  inflight.set(source.id, p);
+  return p;
+}
+
+export function episodeItem(ep: Episode, source: PodcastSource): MediaItem {
+  return {
+    kind: "episode",
+    id: `ep:${source.id}:${ep.guid}`,
+    title: ep.title,
+    subtitle: source.name,
+    image: ep.image,
+    color: source.color,
+    durationSec: ep.durationSec,
+    audioUrl: ep.audioUrl,
+    podcastId: source.id,
+  };
+}
