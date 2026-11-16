@@ -9,7 +9,7 @@ import { loadToken } from "@/lib/spotify";
 import { log } from "@/lib/diagnostics";
 import { setAppPlaying } from "@/lib/appState";
 import { podcastById } from "@/lib/library";
-import { getAutoStory, getMarkers } from "@/lib/markers";
+import { getMarkers, getStartMode } from "@/lib/markers";
 import { useSpotifyPlayer, type SdkState } from "./useSpotifyPlayer";
 
 export type SleepMode = "end" | 15 | 30 | 45;
@@ -36,6 +36,9 @@ type PlayerCtx = {
   /** Absolute Stelle, an der die eigentliche Geschichte beginnt (oder null) */
   storyAt: number | null;
   skipToStory: () => void;
+  /** Absolute Stelle, an der die Entspannung beginnt (oder null) */
+  relaxAt: number | null;
+  skipToRelax: () => void;
 };
 
 const Ctx = createContext<PlayerCtx | null>(null);
@@ -69,6 +72,7 @@ export default function PlayerProvider({ children }: { children: React.ReactNode
   const [error, setError] = useState<string | null>(null);
   const [spotifyEnabled, setSpotifyEnabled] = useState(false);
   const [storyAt, setStoryAt] = useState<number | null>(null);
+  const [relaxAt, setRelaxAt] = useState<number | null>(null);
 
   useEffect(() => {
     setSpotifyEnabled(!!loadToken());
@@ -194,6 +198,7 @@ export default function PlayerProvider({ children }: { children: React.ReactNode
           const saved = getProgress(item.id);
           const source = item.podcastId ? podcastById(item.podcastId) : undefined;
           setStoryAt(null);
+          setRelaxAt(null);
           const markers = getMarkers(item);
           const resumed = Boolean(saved && !saved.finished && saved.pos > 5);
           a.addEventListener(
@@ -217,16 +222,27 @@ export default function PlayerProvider({ children }: { children: React.ReactNode
               }
               const adEnd = m?.source === "ki" ? m.content + shift : feedOffset;
               const story = m?.story != null ? m.story + shift : null;
+              const relax = m?.relax != null && story != null ? m.relax + shift : null;
               setStoryAt(story);
-              if (story != null) log("info", `Geschichte beginnt bei ${Math.round(story)} s (${m?.source})`);
+              setRelaxAt(relax);
+              if (story != null) log("info", `Entspannung ab ${relax == null ? "–" : Math.round(relax)} s, Geschichte ab ${Math.round(story)} s (${m?.source})`);
               if (resumed) return;
               const pos = a.currentTime;
-              if (story != null && item.podcastId && getAutoStory(item.podcastId) && pos < story - 5) {
-                a.currentTime = story;
-                log("ok", "Automatisch zur Geschichte gesprungen");
-              } else if (adEnd > 3 && source?.skipAds !== false && pos < adEnd - 2) {
-                a.currentTime = adEnd;
-                log("ok", `Werbung übersprungen (${Math.round(adEnd)} s)`);
+              // Werbung immer überspringen; danach je nach Einstellung der Eltern weiter springen
+              const mode = item.podcastId ? getStartMode(item.podcastId) : "anfang";
+              const target =
+                mode === "geschichte" && story != null
+                  ? story
+                  : mode !== "anfang" && relax != null
+                    ? relax
+                    : mode === "entspannung" && story != null
+                      ? story
+                      : adEnd > 3 && source?.skipAds !== false
+                        ? adEnd
+                        : 0;
+              if (target > pos + 2) {
+                a.currentTime = target;
+                log("ok", `Start bei ${Math.round(target)} s (${target === adEnd ? "nach der Werbung" : mode})`);
               }
             },
             { once: true },
@@ -235,6 +251,7 @@ export default function PlayerProvider({ children }: { children: React.ReactNode
           saveProgress(item, saved && !saved.finished ? saved.pos : 0, item.durationSec || 0);
         } else if (item.kind === "track" && item.uri) {
           setStoryAt(null);
+          setRelaxAt(null);
           audioRef.current?.pause();
           engineRef.current = "spotify";
           await spotifyRef.current.play(item.uri);
@@ -277,6 +294,13 @@ export default function PlayerProvider({ children }: { children: React.ReactNode
       log("info", "Zur Geschichte gesprungen");
     }
   }, [storyAt, seekTo]);
+
+  const skipToRelax = useCallback(() => {
+    if (relaxAt != null) {
+      seekTo(relaxAt);
+      log("info", "Zur Entspannung gesprungen");
+    }
+  }, [relaxAt, seekTo]);
 
   // Schlaf-Timer: nach X Minuten langsam leiser werden und anhalten
   const setSleep = useCallback((m: SleepMode) => {
@@ -340,8 +364,10 @@ export default function PlayerProvider({ children }: { children: React.ReactNode
       error,
       storyAt,
       skipToStory,
+      relaxAt,
+      skipToRelax,
     }),
-    [current, more, playing, position, duration, expanded, open, close, play, toggle, seekBy, seekTo, sleep, setSleep, sleepEndsAt, spotifyHook.ready, spotifyHook.error, error, storyAt, skipToStory],
+    [current, more, playing, position, duration, expanded, open, close, play, toggle, seekBy, seekTo, sleep, setSleep, sleepEndsAt, spotifyHook.ready, spotifyHook.error, error, storyAt, skipToStory, relaxAt, skipToRelax],
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

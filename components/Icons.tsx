@@ -102,3 +102,10 @@ export const IconSkip = ({ size = 26 }: P) => (
     <rect x="19" y="5" width="2.4" height="14" rx="1" />
   </svg>
 );
+
+export const IconBook = ({ size = 26 }: P) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M3 5.5C3 4.7 3.7 4 4.5 4H10a2 2 0 0 1 2 2v14a2 2 0 0 0-2-2H4.5C3.7 18 3 17.3 3 16.5z" />
+    <path d="M21 5.5c0-.8-.7-1.5-1.5-1.5H14a2 2 0 0 0-2 2v14a2 2 0 0 1 2-2h5.5c.8 0 1.5-.7 1.5-1.5z" />
+  </svg>
+);

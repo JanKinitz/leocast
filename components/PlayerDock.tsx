@@ -8,7 +8,7 @@ import { useState } from "react";
 import { isLiked, toggleLike, useStoreVersion } from "@/lib/store";
 import { usePlayer, type SleepMode } from "./PlayerProvider";
 import { PlayTile } from "./Tiles";
-import { IconBack10, IconDown, IconFwd30, IconHeart, IconMoon, IconPause, IconPlay, IconSkip } from "./Icons";
+import { IconBack10, IconDown, IconFwd30, IconHeart, IconMoon, IconPause, IconPlay, IconBook } from "./Icons";
 import { img } from "@/lib/img";
 
 function fmt(sec: number) {
@@ -71,6 +71,15 @@ function FullPlayer() {
           {item.subtitle && <div className="fp-subtitle">{item.subtitle}</div>}
 
           <div className="fp-progress">
+            {p.storyAt != null && p.duration > 0 && (
+              <div className="chapter-strip" aria-hidden="true">
+                <span className="ch-intro" style={{ width: `${((p.relaxAt ?? p.storyAt) / p.duration) * 100}%` }} />
+                {p.relaxAt != null && (
+                  <span className="ch-relax" style={{ width: `${((p.storyAt - p.relaxAt) / p.duration) * 100}%` }} />
+                )}
+                <span className="ch-story" />
+              </div>
+            )}
             <input
               type="range"
               min={0}
@@ -100,11 +109,22 @@ function FullPlayer() {
             </button>
           </div>
 
-          {p.storyAt != null && p.position < p.storyAt - 5 && (
-            <button className="story-btn" onClick={p.skipToStory}>
-              <IconSkip />
-              Zur Geschichte
-            </button>
+          {/* Sprungknöpfe: nur zeigen, was noch vor einem liegt */}
+          {((p.relaxAt != null && p.position < p.relaxAt - 3) || (p.storyAt != null && p.position < p.storyAt - 3)) && (
+            <div className="jump-row">
+              {p.relaxAt != null && p.position < p.relaxAt - 3 && (
+                <button className="jump-btn relax" onClick={p.skipToRelax}>
+                  <IconMoon size={28} />
+                  Ausruhen
+                </button>
+              )}
+              {p.storyAt != null && p.position < p.storyAt - 3 && (
+                <button className="jump-btn story" onClick={p.skipToStory}>
+                  <IconBook size={28} />
+                  Geschichte
+                </button>
+              )}
+            </div>
           )}
 
           {p.error && <div className="fp-error">{p.error}</div>}

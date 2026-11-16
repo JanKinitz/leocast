@@ -1405,3 +1405,66 @@ h3 {
   color: var(--muted);
   font-weight: 700;
 }
+
+/* ---------- Sprungknöpfe im Player: Ausruhen (Mond) und Geschichte (Buch) ---------- */
+.jump-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+}
+
+.jump-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 64px;
+  padding: 0 24px;
+  border: 0;
+  border-radius: 999px;
+  font-weight: 900;
+  font-size: 20px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+}
+
+.jump-btn.relax {
+  background: #b197fc;
+  color: #1b1d33;
+}
+
+.jump-btn.story {
+  background: #ffffff;
+  color: #1b1d33;
+}
+
+/* Farbige Abschnitte über dem Fortschrittsbalken: grau Vorspann, lila Ausruhen, grün Geschichte */
+.chapter-strip {
+  display: flex;
+  height: 6px;
+  border-radius: 3px;
+  overflow: hidden;
+  margin-bottom: 6px;
+}
+
+.ch-intro {
+  background: #5d6390;
+}
+
+.ch-relax {
+  background: #b197fc;
+}
+
+.ch-story {
+  flex: 1;
+  background: #51cf66;
+}
+
+.intro-list .start-mode {
+  font: inherit;
+  min-height: 52px;
+  border-radius: 14px;
+  border: 0;
+  padding: 0 10px;
+  background: var(--surface-2);
+  color: var(--ink);
+}

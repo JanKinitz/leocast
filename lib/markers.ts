@@ -11,6 +11,8 @@ import { log } from "./diagnostics";
 export type Markers = {
   /** Beginn der Geschichte in Sekunden */
   story: number | null;
+  /** Beginn der Entspannung (hinlegen, atmen) in Sekunden */
+  relax?: number | null;
   /** Ende der Fremdwerbung in Sekunden (nur KI) */
   content: number;
   /** Länge der analysierten Datei, um abweichende Werbelänge auf dem Gerät auszugleichen */
@@ -68,12 +70,16 @@ export function getManualIntro(podcastId: string): number | null {
 export function setManualIntro(podcastId: string, sec: number | null) {
   write(manualKey(podcastId), sec);
 }
-/** Automatisch zur Geschichte springen (statt nur den Knopf zu zeigen) */
-export function getAutoStory(podcastId: string): boolean {
-  return read<boolean>(autoKey(podcastId), false);
+/** Wo eine Folge beim Start beginnt (Werbung wird immer übersprungen) */
+export type StartMode = "anfang" | "entspannung" | "geschichte";
+
+export function getStartMode(podcastId: string): StartMode {
+  const v = read<StartMode | boolean | null>(autoKey(podcastId), null);
+  if (v === true) return "geschichte"; // frühere Einstellung „Automatisch“
+  return v === "entspannung" || v === "geschichte" ? v : "anfang";
 }
-export function setAutoStory(podcastId: string, on: boolean) {
-  write(autoKey(podcastId), on);
+export function setStartMode(podcastId: string, mode: StartMode) {
+  write(autoKey(podcastId), mode === "anfang" ? null : mode);
 }
 
 // ---- Vorab-Analysen aus GitHub (Zweig „markers“, gefüllt von .github/workflows/analyse.yml) ----
@@ -81,6 +87,7 @@ const RAW = "https://raw.githubusercontent.com/JanKinitz/leocast/markers";
 const INDEX_KEY = "leocast:marker-index";
 type IndexEntry = {
   storyStart?: number | null;
+  relaxStart?: number | null;
   contentStart?: number;
   totalSec?: number | null;
   reason?: string;
@@ -127,6 +134,7 @@ async function fromIndex(item: MediaItem): Promise<Markers | null> {
   if (!e || e.error) return null;
   return {
     story: e.storyStart ?? null,
+    relax: e.relaxStart ?? null,
     content: e.contentStart || 0,
     totalSec: e.totalSec ?? null,
     absolute: true,
@@ -181,6 +189,7 @@ async function fromAi(item: MediaItem): Promise<Markers | null> {
   log("ok", `KI-Analyse „${item.title}“: Geschichte ab ${fmt(data.storyStart)} – ${data.reason || ""}`);
   return {
     story: data.storyStart,
+    relax: data.relaxStart ?? null,
     content: data.contentStart || 0,
     totalSec: data.totalSec,
     absolute: true,

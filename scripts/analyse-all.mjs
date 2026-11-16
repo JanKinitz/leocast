@@ -64,6 +64,10 @@ for (const [h, e] of Object.entries(index.entries)) {
   if (!before.some((x) => x.l === "E")) {
     console.log(`Kein Sprung mehr (keine Entspannung): ${e.title}`);
     e.storyStart = null;
+  } else if (e.relaxStart == null) {
+    // Beginn der Entspannung nachtragen – ohne neue Analyse
+    const first = before.find((x) => x.l === "E" && x.t > (e.contentStart || 0));
+    if (first) e.relaxStart = first.t;
   }
 }
 

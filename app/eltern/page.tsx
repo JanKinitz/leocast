@@ -42,7 +42,7 @@ function InstallCard() {
     </section>
   );
 }
-import { aiConfigured, getAutoStory, getManualIntro, setAutoStory, setManualIntro } from "@/lib/markers";
+import { aiConfigured, getManualIntro, getStartMode, setManualIntro, setStartMode, type StartMode } from "@/lib/markers";
 
 function fmtMinSec(sec: number | null) {
   if (!sec) return "";
@@ -76,8 +76,9 @@ function IntroSettings() {
             : "KI-Analyse ist noch nicht eingerichtet (GROQ_API_KEY fehlt bei Vercel). Bis dahin nutzt Leocast Transkripte, wo es sie gibt."}
       </p>
       <p className="hint">
-        „Automatisch“ springt beim Start direkt zur Geschichte. Sonst erscheint im Player der Knopf „Zur Geschichte“. Die Minuten
-        brauchst du nur, wenn die Analyse bei einem Podcast nicht klappt.
+        Werbung wird immer übersprungen. Danach kannst du je Podcast wählen, wo die Folge beginnt. Im Player gibt es außerdem
+        die Knöpfe „Ausruhen“ (Mond) und „Geschichte“ (Buch), solange diese Stellen noch vor einem liegen. Die Minuten brauchst
+        du nur, wenn die Analyse bei einem Podcast nicht klappt.
       </p>
       <ul className="intro-list">
         {allPodcasts().map((p) => {
@@ -93,14 +94,16 @@ function IntroSettings() {
                 value={value}
                 onChange={(e) => setDrafts({ ...drafts, [p.id]: e.target.value })}
               />
-              <label className="auto-toggle">
-                <input
-                  type="checkbox"
-                  checked={getAutoStory(p.id)}
-                  onChange={(e) => setAutoStory(p.id, e.target.checked)}
-                />
-                Automatisch
-              </label>
+              <select
+                className="start-mode"
+                aria-label={`Start bei ${p.name}`}
+                value={getStartMode(p.id)}
+                onChange={(e) => setStartMode(p.id, e.target.value as StartMode)}
+              >
+                <option value="anfang">Start nach der Werbung</option>
+                <option value="entspannung">Start beim Ausruhen</option>
+                <option value="geschichte">Start bei der Geschichte</option>
+              </select>
               <button
                 className="secondary"
                 onClick={() => {

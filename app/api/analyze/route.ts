@@ -115,7 +115,7 @@ Antworte nur mit kurzem JSON. Für jeden Block nur die Nummer des ERSTEN Abschni
 {"blocks":[{"from":0,"type":"W"},{"from":4,"type":"I"},{"from":11,"type":"E"},{"from":27,"type":"G"}],
 "reason":"<ein kurzer Satz, woran du den Beginn der Geschichte erkennst>"}`;
 
-type Decision = { content: number; story: number | null; reason: string; labels: string; model: string; warnings: string[] };
+type Decision = { content: number; story: number | null; relax: number | null; reason: string; labels: string; model: string; warnings: string[] };
 
 async function decide(segs: Seg[], key: string, title: string, show: string): Promise<Decision> {
   const lines = segs
@@ -184,7 +184,7 @@ async function decide(segs: Seg[], key: string, title: string, show: string): Pr
 }
 
 /** Werbung endet beim ersten Nicht-W; Geschichte = erster G-Abschnitt, nach dem es überwiegend mit G weitergeht */
-function fromLabels(labels: string, segs: Seg[]): { content: number; story: number | null } {
+function fromLabels(labels: string, segs: Seg[]): { content: number; story: number | null; relax: number | null } {
   let content = 0;
   while (content < labels.length && labels[content] === "W") content++;
   if (content >= labels.length) content = 0;
@@ -202,7 +202,10 @@ function fromLabels(labels: string, segs: Seg[]): { content: number; story: numb
   // Bei Wissens-Podcasts (CheckPod, Anna, Ole) bleibt das Intro, wie es ist.
   const hasRelax = story != null && labels.slice(content, story).includes("E");
   if (story != null && (!hasRelax || segs[story].start - segs[content].start < 20)) story = null;
-  return { content, story };
+  // Beginn der Entspannung: erster E-Abschnitt nach der Werbung (nur wenn es danach eine Geschichte gibt)
+  const e = labels.indexOf("E", content);
+  const relax = story != null && e >= 0 && e < story && e > content ? e : null;
+  return { content, story, relax };
 }
 
 export async function GET(request: Request) {
@@ -244,6 +247,7 @@ export async function GET(request: Request) {
       {
         source: "ki",
         storyStart: story,
+        relaxStart: d.relax != null ? segs[d.relax].start : null,
         contentStart: content > 3 ? content : 0,
         totalSec,
         firstWords: d.story != null ? segs[d.story].text.slice(0, 120) : null,
