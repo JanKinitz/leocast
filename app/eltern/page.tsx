@@ -9,6 +9,36 @@ import { getMe, loadToken, logout, startLogin } from "@/lib/spotify";
 import { storageEstimate } from "@/lib/offline";
 import { getDownloads, useStoreVersion } from "@/lib/store";
 import { PODCASTS } from "@/lib/library";
+import { canInstall, isStandalone, onInstallChange, promptInstall } from "@/lib/install";
+
+function InstallCard() {
+  const [, rerender] = useState(0);
+  useEffect(() => onInstallChange(() => rerender((n) => n + 1)), []);
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  if (!mounted) return null;
+  const standalone = isStandalone();
+  return (
+    <section className="card">
+      <h2>App auf dem Startbildschirm</h2>
+      {standalone ? (
+        <p className="hint">Leocast ist installiert und läuft als App. Updates lädt die App von selbst, sobald nichts abgespielt wird.</p>
+      ) : canInstall() ? (
+        <>
+          <p className="hint">Installiere Leocast als App: eigenes Symbol, Vollbild, startet auch ohne Internet.</p>
+          <button className="button" onClick={() => promptInstall()}>
+            App installieren
+          </button>
+        </>
+      ) : (
+        <p className="hint">
+          Chrome bietet die Installation gerade nicht direkt an. So geht es von Hand: oben rechts auf ⋮ tippen, dann „App
+          installieren“ oder „Zum Startbildschirm hinzufügen“.
+        </p>
+      )}
+    </section>
+  );
+}
 import { aiConfigured, getAutoStory, getManualIntro, setAutoStory, setManualIntro } from "@/lib/markers";
 
 function fmtMinSec(sec: number | null) {
@@ -192,6 +222,8 @@ export default function Eltern() {
         </p>
         <p className="hint">Folgen speicherst du in einer Sendung über „Für unterwegs speichern“.</p>
       </section>
+
+      <InstallCard />
 
       <IntroSettings />
 

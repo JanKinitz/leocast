@@ -1,6 +1,7 @@
 "use client";
 
 // Startseite: Weiterhören, Meine Podcasts, Meine Lieder, Gute Nacht – alles als wischbare Kachel-Reihen.
+import InstallBanner from "@/components/InstallBanner";
 import TopNav from "@/components/TopNav";
 import { LinkTile, PlayTile, Rail } from "@/components/Tiles";
 import { useFeed, useOnline, useSpotifyPlaylists } from "@/components/hooks";
@@ -28,6 +29,7 @@ export default function Home() {
   return (
     <main className="page">
       <TopNav />
+      <InstallBanner />
 
       {!online && <div className="offline-note">Kein Internet – hier ist alles, was du ohne Internet hören kannst.</div>}
 

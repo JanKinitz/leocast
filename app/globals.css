@@ -981,3 +981,17 @@ h3 {
     grid-column: 1 / -1;
   }
 }
+
+.install-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 8px 0 16px;
+  padding: 14px 18px;
+  border-radius: 22px;
+  background: var(--surface, #1e2240);
+  font-weight: 800;
+  font-size: 18px;
+}

@@ -4,7 +4,8 @@
 // - Gespeicherte Podcast-Folgen: aus dem Audio-Speicher, mit Unterstützung für Spulen (Range)
 // - /api/feed: zuerst Netz, sonst letzte Antwort
 
-const VERSION = "v3";
+// Version kommt aus der Adresse (/sw.js?v=<Build>) – jede neue Version installiert sich selbst
+const VERSION = new URL(self.location.href).searchParams.get("v") || "v3";
 const APP_CACHE = `leocast-app-${VERSION}`;
 const AUDIO_CACHE = "leocast-audio-v1";
 const SHELL = ["/", "/ich", "/manifest.webmanifest", "/icons/icon-192.png", "/icons/icon-512.png"];

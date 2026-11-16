@@ -7,6 +7,7 @@ import { playableSrc } from "@/lib/offline";
 import { getProgress, saveProgress } from "@/lib/store";
 import { loadToken } from "@/lib/spotify";
 import { log } from "@/lib/diagnostics";
+import { setAppPlaying } from "@/lib/appState";
 import { podcastById } from "@/lib/library";
 import { getAutoStory, getMarkers } from "@/lib/markers";
 import { useSpotifyPlayer, type SdkState } from "./useSpotifyPlayer";
@@ -59,6 +60,7 @@ export default function PlayerProvider({ children }: { children: React.ReactNode
   const [current, setCurrent] = useState<MediaItem | null>(null);
   const [more, setMore] = useState<MediaItem[]>([]);
   const [playing, setPlaying] = useState(false);
+  useEffect(() => setAppPlaying(playing), [playing]);
   const [position, setPosition] = useState(0);
   const [duration, setDuration] = useState(0);
   const [expanded, setExpanded] = useState(false);
