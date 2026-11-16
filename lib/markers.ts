@@ -91,18 +91,20 @@ function fmt(sec: number | null | undefined) {
 export function getMarkers(item: MediaItem): Promise<Markers | null> {
   if (item.kind !== "episode") return Promise.resolve(null);
   const cached = read<Markers | null>(key(item.id), null);
-  if (cached) return Promise.resolve(cached);
+  const offline = typeof navigator !== "undefined" && !navigator.onLine;
+  // Ergebnisse ohne KI nur behalten, bis die KI-Analyse klappt
+  if (cached && (cached.source === "ki" || offline)) return Promise.resolve(cached);
   const manual = (): Markers | null => {
     const m = item.podcastId ? getManualIntro(item.podcastId) : null;
     return m ? { story: m, content: 0, totalSec: null, absolute: true, source: "eingestellt" } : null;
   };
-  if (typeof navigator !== "undefined" && !navigator.onLine) return Promise.resolve(manual());
+  if (offline) return Promise.resolve(manual());
   const running = pending.get(item.id);
   if (running) return running;
   const job = (async () => {
     let m: Markers | null = null;
     try {
-      m = (await fromAi(item)) || (await fromTranscript(item));
+      m = (await fromAi(item)) || cached || (await fromTranscript(item));
     } catch (e) {
       log("info", `Sprungmarke „${item.title}“: ${(e as Error).message}`);
     }
