@@ -6,6 +6,8 @@ on:
 jobs:
   shots:
     runs-on: ubuntu-latest
+    env:
+      VERCEL_GIT_COMMIT_SHA: ${{ github.sha }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
