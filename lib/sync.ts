@@ -1,0 +1,231 @@
+"use client";
+
+// Abgleich zwischen Handy und Tablet (Familien-Schlüssel, Server: /api/sync).
+// Abgeglichen werden: Mag ich, Fortschritt, selbst hinzugefügte/ausgeblendete Podcasts, Reihen-Zuordnung,
+// Einstellungen „Vorspann“ und „Automatisch“, von Eltern korrigierte Sprungmarken.
+// Pro Gerät: Name und welche Folgen dort offline gespeichert sind.
+import { getDownloads, read, setWriteHook, writeRaw } from "./store";
+import { CODE_ALPHABET, emptyState, normalizeCode, type DeviceInfo, type Stamped, type SyncState } from "./syncCore";
+import { log } from "./diagnostics";
+
+const MAP_KEYS = ["leocast:likes", "leocast:progress", "leocast:podcast-category"];
+const LIST_KEYS = ["leocast:custom-podcasts"]; // Listen von Objekten mit id
+const SCALAR_KEYS = ["leocast:hidden-podcasts"];
+const SCALAR_PREFIXES = ["leocast:intro:", "leocast:autostory:"];
+const CORRECTION_PREFIX = "leocast:markers3:"; // nur von Eltern korrigierte Sprungmarken
+
+const META = "leocast:sync-meta";
+const CODE = "leocast:family-code";
+const DEVICE = "leocast:device";
+const STATUS = "leocast:sync-status";
+
+type Meta = Record<string, Record<string, number>>;
+export type SyncStatus = { at: number; ok: boolean; message: string; devices?: Record<string, DeviceInfo> };
+
+const isScalar = (key: string) =>
+  SCALAR_KEYS.includes(key) || SCALAR_PREFIXES.some((p) => key.startsWith(p)) || key.startsWith(CORRECTION_PREFIX);
+const isSynced = (key: string) => MAP_KEYS.includes(key) || LIST_KEYS.includes(key) || isScalar(key);
+
+function asMap(key: string, value: unknown): Record<string, unknown> {
+  if (value == null) return {};
+  if (LIST_KEYS.includes(key) && Array.isArray(value))
+    return Object.fromEntries(value.map((x: { id: string }) => [x.id, x]));
+  if (MAP_KEYS.includes(key) && typeof value === "object") return value as Record<string, unknown>;
+  return { _: value };
+}
+
+function fromMap(key: string, map: Record<string, unknown>): unknown {
+  const entries = Object.entries(map).filter(([, v]) => v != null);
+  if (LIST_KEYS.includes(key)) return entries.map(([, v]) => v);
+  if (MAP_KEYS.includes(key)) return Object.fromEntries(entries);
+  return map._ ?? null;
+}
+
+// ---- Änderungen vermerken ----
+let onLocalChange: ((key: string) => void) | null = null;
+
+setWriteHook((key, before, after) => {
+  if (!isSynced(key)) return;
+  if (key.startsWith(CORRECTION_PREFIX) && !(after as { corrected?: boolean } | null)?.corrected) return;
+  const now = Date.now();
+  const a = asMap(key, before);
+  const b = asMap(key, after);
+  const meta = read<Meta>(META, {});
+  const m = (meta[key] ||= {});
+  let changed = false;
+  for (const id of new Set([...Object.keys(a), ...Object.keys(b)])) {
+    if (JSON.stringify(a[id] ?? null) !== JSON.stringify(b[id] ?? null)) {
+      m[id] = now;
+      changed = true;
+    }
+  }
+  if (changed) {
+    writeRaw(META, meta);
+    onLocalChange?.(key);
+  }
+});
+
+export function setLocalChangeListener(fn: (key: string) => void) {
+  onLocalChange = fn;
+}
+
+// ---- Familien-Schlüssel und Gerät ----
+export function getFamilyCode(): string | null {
+  return read<string | null>(CODE, null);
+}
+
+export function setFamilyCode(input: string | null): boolean {
+  if (input === null) {
+    writeRaw(CODE, null);
+    return true;
+  }
+  const code = normalizeCode(input);
+  if (!code) return false;
+  writeRaw(CODE, code);
+  return true;
+}
+
+export function newFamilyCode(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(16));
+  return [...bytes]
+    .map((b) => CODE_ALPHABET[b % CODE_ALPHABET.length])
+    .join("")
+    .match(/.{4}/g)!
+    .join("-");
+}
+
+type Device = { id: string; name: string; changed: number };
+
+export function getDevice(): Device {
+  let d = read<Device | null>(DEVICE, null);
+  if (!d) {
+    const tablet = typeof window !== "undefined" && Math.min(window.screen.width, window.screen.height) >= 600;
+    d = { id: crypto.randomUUID(), name: tablet ? "Tablet" : "Handy", changed: Date.now() };
+    writeRaw(DEVICE, d);
+  }
+  return d;
+}
+
+export function setDeviceName(name: string) {
+  const d = getDevice();
+  writeRaw(DEVICE, { ...d, name: name.trim().slice(0, 30) || d.name, changed: Date.now() });
+}
+
+export function getSyncStatus(): SyncStatus | null {
+  return read<SyncStatus | null>(STATUS, null);
+}
+
+// ---- Stand bauen und übernehmen ----
+function localKeys(): string[] {
+  const keys = new Set<string>([...MAP_KEYS, ...LIST_KEYS, ...SCALAR_KEYS]);
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (k && isScalar(k)) keys.add(k);
+  }
+  for (const k of Object.keys(read<Meta>(META, {}))) keys.add(k);
+  return [...keys];
+}
+
+function buildState(): SyncState {
+  const state = emptyState();
+  const meta = read<Meta>(META, {});
+  for (const key of localKeys()) {
+    const value = read<unknown>(key, null);
+    if (key.startsWith(CORRECTION_PREFIX) && !(value as { corrected?: boolean } | null)?.corrected && !meta[key]) continue;
+    const map = asMap(key, value);
+    const stamps = meta[key] || {};
+    const items: Record<string, Stamped> = {};
+    for (const id of new Set([...Object.keys(map), ...Object.keys(stamps)])) {
+      // Ältere Daten ohne Vermerk zählen als „sehr alt“, damit neuere Änderungen gewinnen
+      items[id] = { v: map[id] ?? null, at: stamps[id] || 1 };
+    }
+    if (Object.keys(items).length) state.keys[key] = items;
+  }
+  const device = getDevice();
+  const downloads = Object.fromEntries(
+    Object.entries(getDownloads()).map(([id, d]) => [
+      id,
+      { title: d.item.title, podcastId: d.item.podcastId, image: d.item.image },
+    ]),
+  );
+  const own: DeviceInfo = { name: device.name, at: device.changed, downloads };
+  // Downloads geändert? Dann zählt das als Änderung am Gerät
+  const last = read<string>("leocast:sync-downloads", "");
+  const sig = JSON.stringify(Object.keys(downloads).sort()) + device.name;
+  if (sig !== last) {
+    own.at = Date.now();
+    writeRaw(DEVICE, { ...device, changed: own.at });
+    writeRaw("leocast:sync-downloads", sig);
+  }
+  state.devices[device.id] = own;
+  return state;
+}
+
+function applyState(remote: SyncState) {
+  const meta = read<Meta>(META, {});
+  let changed = false;
+  for (const [key, items] of Object.entries(remote.keys)) {
+    if (!isSynced(key)) continue;
+    const local = asMap(key, read<unknown>(key, null));
+    const stamps = (meta[key] ||= {});
+    let keyChanged = false;
+    for (const [id, item] of Object.entries(items)) {
+      if (item.at > (stamps[id] || 0)) {
+        stamps[id] = item.at;
+        if (JSON.stringify(local[id] ?? null) !== JSON.stringify(item.v ?? null)) {
+          local[id] = item.v;
+          keyChanged = true;
+        }
+      }
+    }
+    if (keyChanged) {
+      writeRaw(key, fromMap(key, local));
+      changed = true;
+    }
+  }
+  writeRaw(META, meta);
+  return changed;
+}
+
+// ---- Abgleich ausführen ----
+let running: Promise<void> | null = null;
+
+export function syncNow(reason = ""): Promise<void> {
+  const code = getFamilyCode();
+  if (!code || typeof navigator === "undefined" || !navigator.onLine) return Promise.resolve();
+  if (running) return running;
+  running = (async () => {
+    try {
+      const res = await fetch("/api/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code, state: buildState() }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || res.status);
+      const changed = applyState(data.state as SyncState);
+      writeRaw(STATUS, {
+        at: Date.now(),
+        ok: true,
+        message: changed ? "Neues vom anderen Gerät übernommen" : "Alles auf dem gleichen Stand",
+        devices: (data.state as SyncState).devices,
+      } satisfies SyncStatus);
+      if (changed || data.wrote) log("ok", `Abgleich${reason ? ` (${reason})` : ""}: ${changed ? "übernommen" : "gesendet"}`);
+    } catch (e) {
+      writeRaw(STATUS, { at: Date.now(), ok: false, message: (e as Error).message } satisfies SyncStatus);
+      log("error", `Abgleich: ${(e as Error).message}`);
+    } finally {
+      running = null;
+    }
+  })();
+  return running;
+}
+
+export async function syncConfigured(): Promise<boolean> {
+  try {
+    const res = await fetch("/api/sync");
+    return Boolean((await res.json()).configured);
+  } catch {
+    return false;
+  }
+}

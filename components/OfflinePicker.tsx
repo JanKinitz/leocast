@@ -7,6 +7,7 @@ import { getDownloads, markDownloaded, unmarkDownloaded, useStoreVersion } from 
 import { downloadEpisode, removeEpisode, requestPersistentStorage, storageEstimate } from "@/lib/offline";
 import { prefetchMarkers } from "@/lib/markers";
 import { log } from "@/lib/diagnostics";
+import { getDevice, getSyncStatus } from "@/lib/sync";
 import { img } from "@/lib/img";
 import { IconBack, IconCheck } from "./Icons";
 
@@ -21,6 +22,12 @@ const mb = (n: number) => `${Math.max(1, Math.round(n))} MB`;
 export default function OfflinePicker({ items, onClose }: { items: MediaItem[]; onClose: () => void }) {
   useStoreVersion();
   const downloads = getDownloads();
+  // Was auf den anderen Geräten gespeichert ist (aus dem letzten Abgleich)
+  const own = getDevice().id;
+  const elsewhere = (id: string) =>
+    Object.entries(getSyncStatus()?.devices || {})
+      .filter(([dev, d]) => dev !== own && d.downloads?.[id])
+      .map(([, d]) => d.name);
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState<string | null>(null);
   const [done, setDone] = useState(0);
@@ -97,6 +104,7 @@ export default function OfflinePicker({ items, onClose }: { items: MediaItem[]; 
                   <span className="pick-meta">
                     {it.durationSec ? `${Math.round(it.durationSec / 60)} Min. · ` : ""}
                     {saved ? "gespeichert" : mb(sizeMb(it))}
+                    {elsewhere(it.id).length ? ` · auf ${elsewhere(it.id).join(" und ")} gespeichert` : ""}
                     {busy === it.id ? " · wird gespeichert …" : ""}
                   </span>
                 </span>

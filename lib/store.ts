@@ -38,9 +38,29 @@ export function read<T>(key: string, fallback: T): T {
   }
 }
 
+// Der Abgleich zwischen Geräten (lib/sync.ts) merkt sich hier, was sich wann geändert hat
+type WriteHook = (key: string, before: unknown, after: unknown) => void;
+let writeHook: WriteHook | null = null;
+export function setWriteHook(fn: WriteHook) {
+  writeHook = fn;
+}
+
 export function write(key: string, value: unknown) {
+  if (writeHook) {
+    try {
+      writeHook(key, read(key, null), value);
+    } catch {
+      /* Abgleich darf nie das Speichern verhindern */
+    }
+  }
+  writeRaw(key, value);
+}
+
+/** Speichern ohne Abgleich-Vermerk (für Daten, die vom anderen Gerät kommen) */
+export function writeRaw(key: string, value: unknown) {
   try {
-    localStorage.setItem(key, JSON.stringify(value));
+    if (value === null || value === undefined) localStorage.removeItem(key);
+    else localStorage.setItem(key, JSON.stringify(value));
   } catch {
     /* Speicher voll */
   }

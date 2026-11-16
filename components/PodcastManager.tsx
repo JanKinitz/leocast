@@ -173,7 +173,7 @@ export default function PodcastManager() {
 
       {message && <p className="hint">{message}</p>}
       <p className="hint">
-        Neue Podcasts gelten vorerst nur auf diesem Gerät. Der Abgleich zwischen Handy und Tablet kommt als Nächstes.
+        Neue Podcasts erscheinen auf allen verbundenen Geräten (siehe „Geräte abgleichen“).
       </p>
     </section>
   );

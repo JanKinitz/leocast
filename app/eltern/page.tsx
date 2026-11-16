@@ -11,6 +11,7 @@ import { getDownloads, useStoreVersion } from "@/lib/store";
 import { allPodcasts } from "@/lib/library";
 import PodcastManager from "@/components/PodcastManager";
 import AnalysisPanel from "@/components/AnalysisPanel";
+import SyncCard from "@/components/SyncCard";
 import { canInstall, isStandalone, onInstallChange, promptInstall } from "@/lib/install";
 
 function InstallCard() {
@@ -224,6 +225,8 @@ export default function Eltern() {
         </p>
         <p className="hint">Folgen speicherst du in einer Sendung über „Für unterwegs speichern“.</p>
       </section>
+
+      <SyncCard />
 
       <PodcastManager />
 

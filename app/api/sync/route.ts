@@ -1,0 +1,64 @@
+// Abgleich zwischen Geräten: ein Gerät schickt seinen Stand, der Server führt ihn mit dem gespeicherten zusammen
+// und gibt das Ergebnis zurück. Gespeichert wird in Vercel Blob unter einem Pfad, der nur aus dem
+// Familien-Schlüssel berechnet werden kann. Geschrieben wird nur, wenn sich wirklich etwas geändert hat
+// (kostenloses Kontingent: 2.000 Schreibvorgänge im Monat).
+import { createHash } from "node:crypto";
+import { head, put } from "@vercel/blob";
+import { emptyState, mergeStates, normalizeCode, sameState, type SyncState } from "@/lib/syncCore";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+const noStore = { "Cache-Control": "no-store" };
+const MAX_BYTES = 900_000;
+
+const pathFor = (code: string) => `sync/${createHash("sha256").update(`leocast:${code}`).digest("hex")}.json`;
+
+async function load(path: string): Promise<SyncState> {
+  try {
+    const meta = await head(path);
+    const res = await fetch(`${meta.url}?t=${Date.now()}`, { cache: "no-store" });
+    if (!res.ok) return emptyState();
+    const data = (await res.json()) as SyncState;
+    return data && data.v === 1 ? data : emptyState();
+  } catch {
+    return emptyState(); // noch nichts gespeichert
+  }
+}
+
+export async function GET() {
+  return Response.json({ configured: Boolean(process.env.BLOB_READ_WRITE_TOKEN) }, { headers: noStore });
+}
+
+export async function POST(request: Request) {
+  if (!process.env.BLOB_READ_WRITE_TOKEN)
+    return Response.json({ error: "Abgleich ist noch nicht eingerichtet" }, { status: 503, headers: noStore });
+
+  const raw = await request.text();
+  if (raw.length > MAX_BYTES) return Response.json({ error: "zu groß" }, { status: 413, headers: noStore });
+  let body: { code?: string; state?: SyncState };
+  try {
+    body = JSON.parse(raw);
+  } catch {
+    return Response.json({ error: "ungültig" }, { status: 400, headers: noStore });
+  }
+  const code = normalizeCode(body.code || "");
+  if (!code) return Response.json({ error: "Familien-Schlüssel ungültig" }, { status: 400, headers: noStore });
+  const incoming = body.state && body.state.v === 1 ? body.state : emptyState();
+
+  const path = pathFor(code);
+  const stored = await load(path);
+  const merged = mergeStates(stored, incoming);
+  let wrote = false;
+  if (!sameState(stored, merged)) {
+    await put(path, JSON.stringify(merged), {
+      access: "public",
+      addRandomSuffix: false,
+      allowOverwrite: true,
+      contentType: "application/json",
+      cacheControlMaxAge: 60,
+    });
+    wrote = true;
+  }
+  return Response.json({ state: merged, wrote }, { headers: noStore });
+}
