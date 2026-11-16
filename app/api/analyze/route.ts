@@ -6,7 +6,7 @@ export const maxDuration = 120;
 // Aus Frankfurt laden, damit die eingefügte Werbung der auf den Geräten in Deutschland entspricht
 export const preferredRegion = "fra1";
 
-const WINDOW_SEC = 360; // analysiert werden die ersten 6 Minuten (kostenloses Kontingent: 2 Stunden Audio pro Stunde)
+const WINDOW_SEC = 480; // erste 8 Minuten: bei LALUNA beginnt die Geschichte erst nach Werbung, Wünschen und Ritual
 const MAX_BYTES = 24 * 1024 * 1024; // Groq (kostenlos): Dateien bis 25 MB
 const GROQ = "https://api.groq.com/openai/v1";
 const UA = "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Mobile Safari/537.36";
@@ -230,6 +230,7 @@ export async function GET(request: Request) {
         firstWords: d.story != null ? segs[d.story].text.slice(0, 120) : null,
         reason: d.reason,
         model: d.model,
+        window: WINDOW_SEC,
         ...(d.warnings.length ? { warnings: d.warnings.map((w) => w.slice(0, 300)) } : {}),
         // Zum Nachprüfen im Elternbereich: Abschnitte mit Zeit und Einordnung
         ...(debug ? { segments: segs.map((x, i) => ({ t: Math.round(x.start), l: d.labels[i], text: x.text })) } : {}),

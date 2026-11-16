@@ -10,8 +10,8 @@ import { execSync } from "node:child_process";
 const BASE = process.env.LEOCAST_URL || "https://leocast.vercel.app";
 const OUT = process.argv[2] || "markers-out";
 const PER_PODCAST = Number(process.env.PER_PODCAST || 15);
-// Kostenloses Groq-Kontingent: max. 2 Stunden Audio pro Stunde, 6 Minuten pro Folge → höchstens 20 Folgen pro Stunde
-const PAUSE_MS = Number(process.env.PAUSE_MS || 190_000);
+// Kostenloses Groq-Kontingent: max. 2 Stunden Audio pro Stunde, 8 Minuten pro Folge → höchstens 15 Folgen pro Stunde
+const PAUSE_MS = Number(process.env.PAUSE_MS || 245_000);
 const MAX_RUNTIME_MS = Number(process.env.MAX_RUNTIME_MS || 5 * 60 * 60 * 1000);
 const RETRY_ERRORS_AFTER = 7 * 24 * 3600 * 1000;
 
@@ -99,7 +99,8 @@ for (const ep of queue) {
   const h = hashUrl(ep.audioUrl);
   const known = index.entries[h];
   // Fehler erneut versuchen – außer bei Folgen, die grundsätzlich nicht gehen (kein MP3)
-  if (known && (!known.error || (/MP3/.test(known.error) && Date.now() - known.at < RETRY_ERRORS_AFTER))) continue;
+  const retryNoStory = known && !known.error && known.storyStart == null && (known.window || 0) < 480;
+  if (known && !retryNoStory && (!known.error || (/MP3/.test(known.error) && Date.now() - known.at < RETRY_ERRORS_AFTER))) continue;
 
   const q = new URLSearchParams({ v: "2", audio: ep.audioUrl, title: ep.title, show: ep.show, debug: "1", r: String(Date.now()) });
   const { ok, status, data } = await json(`${BASE}/api/analyze?${q}`);
