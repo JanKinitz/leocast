@@ -45,6 +45,8 @@ export type PodcastSource = {
   category: "podcasts" | "gutenacht";
   /** Cover aus dem Verzeichnis (bis der Feed geladen ist) */
   image?: string;
+  /** Sprungmarken per KI – Grundeinstellung (Eltern können es je Podcast ein- und ausschalten) */
+  ai?: boolean;
 };
 
 // Feste Startbibliothek (auch vom Analyse-Skript in GitHub Actions gelesen)
@@ -127,6 +129,19 @@ export function allPodcasts(): PodcastSource[] {
   return [...PODCASTS.filter((p) => !hidden.has(p.id)), ...custom].map((p) =>
     stable(categories[p.id] ? { ...p, category: categories[p.id] } : p),
   );
+}
+
+// ---- Sprungmarken mit KI: je Podcast an/aus (wird zwischen den Geräten abgeglichen) ----
+const aiKey = (id: string) => `leocast:ai:${id}`;
+
+export function isAiEnabled(id: string): boolean {
+  const v = read<boolean | null>(aiKey(id), null);
+  if (v !== null) return v;
+  return Boolean(PODCASTS.find((p) => p.id === id)?.ai);
+}
+
+export function setAiEnabled(id: string, on: boolean) {
+  write(aiKey(id), on);
 }
 
 export function podcastById(id: string): PodcastSource | undefined {

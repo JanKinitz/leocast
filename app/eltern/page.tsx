@@ -8,7 +8,7 @@ import { usePlayer } from "@/components/PlayerProvider";
 import { getMe, loadToken, logout, startLogin } from "@/lib/spotify";
 import { storageEstimate } from "@/lib/offline";
 import { getDownloads, useStoreVersion } from "@/lib/store";
-import { allPodcasts } from "@/lib/library";
+import { allPodcasts, isAiEnabled, setAiEnabled } from "@/lib/library";
 import PodcastManager from "@/components/PodcastManager";
 import AnalysisPanel from "@/components/AnalysisPanel";
 import SyncCard from "@/components/SyncCard";
@@ -42,7 +42,16 @@ function InstallCard() {
     </section>
   );
 }
-import { aiConfigured, getManualIntro, getStartMode, setManualIntro, setStartMode, type StartMode } from "@/lib/markers";
+import {
+  aiConfigured,
+  getManualIntro,
+  getStartMode,
+  loadMarkerIndex,
+  setManualIntro,
+  setStartMode,
+  type PodcastStats,
+  type StartMode,
+} from "@/lib/markers";
 
 function fmtMinSec(sec: number | null) {
   if (!sec) return "";
@@ -62,66 +71,93 @@ function IntroSettings() {
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [saved, setSaved] = useState<string | null>(null);
   const [ai, setAi] = useState<boolean | null>(null);
+  const [stats, setStats] = useState<{ list: PodcastStats[]; updated?: string } | null>(null);
   useEffect(() => {
     aiConfigured().then(setAi);
+    loadMarkerIndex().then((idx) => idx && setStats({ list: idx.stats || [], updated: idx.updated }));
   }, []);
+  const statFor = (id: string, name: string) => stats?.list.find((x) => x.id === id || x.name === name);
+
   return (
     <section className="card">
-      <h2>Werbung und Vorspann überspringen</h2>
+      <h2>Sprungmarken mit KI</h2>
       <p className="hint">
-        {ai === null
-          ? "Prüfe KI-Analyse …"
-          : ai
-            ? "KI-Analyse ist eingerichtet: Leocast hört sich den Anfang jeder Folge an und findet Werbung und den Beginn der Geschichte selbst."
-            : "KI-Analyse ist noch nicht eingerichtet (GROQ_API_KEY fehlt bei Vercel). Bis dahin nutzt Leocast Transkripte, wo es sie gibt."}
+        Schalte es bei Podcasts ein, die Werbung oder einen langen Vorspann mit Entspannung haben. Dann hört sich eine KI den
+        Anfang jeder Folge an. Leocast überspringt die Werbung und zeigt im Player die Knöpfe „Ausruhen“ (Mond) und
+        „Geschichte“ (Buch). Neue Folgen werden etwa alle 2 Stunden analysiert.
+        {ai === false && " Achtung: Der KI-Schlüssel fehlt bei Vercel."}
       </p>
-      <p className="hint">
-        Werbung wird immer übersprungen. Danach kannst du je Podcast wählen, wo die Folge beginnt. Im Player gibt es außerdem
-        die Knöpfe „Ausruhen“ (Mond) und „Geschichte“ (Buch), solange diese Stellen noch vor einem liegen. Die Minuten brauchst
-        du nur, wenn die Analyse bei einem Podcast nicht klappt.
-      </p>
-      <ul className="intro-list">
+      <ul className="ai-list">
         {allPodcasts().map((p) => {
+          const on = isAiEnabled(p.id);
+          const st = statFor(p.id, p.name);
           const current = getManualIntro(p.id);
           const value = drafts[p.id] ?? fmtMinSec(current);
           return (
-            <li key={p.id}>
-              <label htmlFor={`intro-${p.id}`}>{p.name}</label>
-              <input
-                id={`intro-${p.id}`}
-                inputMode="numeric"
-                placeholder="z. B. 3:30"
-                value={value}
-                onChange={(e) => setDrafts({ ...drafts, [p.id]: e.target.value })}
-              />
-              <select
-                className="start-mode"
-                aria-label={`Start bei ${p.name}`}
-                value={getStartMode(p.id)}
-                onChange={(e) => setStartMode(p.id, e.target.value as StartMode)}
-              >
-                <option value="anfang">Start nach der Werbung</option>
-                <option value="entspannung">Start beim Ausruhen</option>
-                <option value="geschichte">Start bei der Geschichte</option>
-              </select>
-              <button
-                className="secondary"
-                onClick={() => {
-                  const sec = parseMinSec(value);
-                  if (sec !== null && Number.isNaN(sec)) {
-                    setSaved(`${p.name}: bitte als Minuten:Sekunden eingeben, z. B. 3:30`);
-                    return;
-                  }
-                  setManualIntro(p.id, sec);
-                  setSaved(sec ? `${p.name}: Geschichte ab ${fmtMinSec(sec)}` : `${p.name}: kein Vorspann eingestellt`);
-                }}
-              >
-                Speichern
-              </button>
+            <li key={p.id} className={on ? "on" : ""}>
+              <label className="ai-switch">
+                <span className="ai-name">{p.name}</span>
+                <input
+                  type="checkbox"
+                  role="switch"
+                  checked={on}
+                  onChange={(e) => setAiEnabled(p.id, e.target.checked)}
+                  aria-label={`Sprungmarken mit KI für ${p.name}`}
+                />
+                <span className="switch-track" aria-hidden="true" />
+              </label>
+              {on && (
+                <div className="ai-details">
+                  <p className="hint">
+                    {st
+                      ? `${st.analysed} von ${st.total} Folgen analysiert${st.withStory ? `, ${st.withStory} mit Geschichte-Knopf` : ""}`
+                      : "Wird beim nächsten Durchlauf analysiert (kann bis zu 2 Stunden dauern)."}
+                  </p>
+                  <select
+                    className="start-mode"
+                    aria-label={`Start bei ${p.name}`}
+                    value={getStartMode(p.id)}
+                    onChange={(e) => setStartMode(p.id, e.target.value as StartMode)}
+                  >
+                    <option value="anfang">Start nach der Werbung</option>
+                    <option value="entspannung">Start beim Ausruhen</option>
+                    <option value="geschichte">Start bei der Geschichte</option>
+                  </select>
+                  <details>
+                    <summary>Ersatz, falls die KI nichts findet</summary>
+                    <div className="pod-search">
+                      <input
+                        id={`intro-${p.id}`}
+                        inputMode="numeric"
+                        placeholder="Geschichte ab, z. B. 3:30"
+                        value={value}
+                        onChange={(e) => setDrafts({ ...drafts, [p.id]: e.target.value })}
+                      />
+                      <button
+                        className="secondary"
+                        onClick={() => {
+                          const sec = parseMinSec(value);
+                          if (sec !== null && Number.isNaN(sec)) {
+                            setSaved(`${p.name}: bitte als Minuten:Sekunden eingeben, z. B. 3:30`);
+                            return;
+                          }
+                          setManualIntro(p.id, sec);
+                          setSaved(sec ? `${p.name}: Geschichte ab ${fmtMinSec(sec)}` : `${p.name}: kein Ersatz eingestellt`);
+                        }}
+                      >
+                        Speichern
+                      </button>
+                    </div>
+                  </details>
+                </div>
+              )}
             </li>
           );
         })}
       </ul>
+      {stats?.updated && (
+        <p className="hint">Stand der Analyse: {new Date(stats.updated).toLocaleString("de-DE", { dateStyle: "short", timeStyle: "short" })}</p>
+      )}
       {saved && <p className="hint">{saved}</p>}
     </section>
   );

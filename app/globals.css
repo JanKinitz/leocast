@@ -1468,3 +1468,100 @@ h3 {
   background: var(--surface-2);
   color: var(--ink);
 }
+
+/* ---------- Elternbereich: Sprungmarken mit KI ---------- */
+.ai-list {
+  list-style: none;
+  padding: 0;
+  margin: 12px 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ai-list > li {
+  padding: 10px 14px;
+  border-radius: 16px;
+  background: var(--surface-2);
+}
+
+.ai-switch {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 52px;
+  cursor: pointer;
+}
+
+.ai-name {
+  font-weight: 800;
+}
+
+.ai-switch input {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+}
+
+.switch-track {
+  flex: none;
+  position: relative;
+  width: 58px;
+  height: 34px;
+  border-radius: 999px;
+  background: #4a4f78;
+  transition: background 0.2s;
+}
+
+.switch-track::after {
+  content: "";
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform 0.2s;
+}
+
+.ai-switch input:checked + .switch-track {
+  background: var(--ok);
+}
+
+.ai-switch input:checked + .switch-track::after {
+  transform: translateX(24px);
+}
+
+.ai-switch input:focus-visible + .switch-track {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.ai-details {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 6px;
+}
+
+.ai-details .start-mode {
+  font: inherit;
+  min-height: 52px;
+  border-radius: 14px;
+  border: 0;
+  padding: 0 10px;
+  background: var(--surface);
+  color: var(--ink);
+}
+
+.ai-details summary {
+  cursor: pointer;
+  font-weight: 700;
+  color: var(--muted);
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+}

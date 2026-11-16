@@ -5,21 +5,24 @@
     "search": "CheckPod Checker Tobi",
     "feedUrl": "https://feeds.br.de/checkpod-der-podcast-mit-checker-tobi/feed.xml",
     "color": "#1f7a63",
-    "category": "podcasts"
+    "category": "podcasts",
+    "ai": false
   },
   {
     "id": "anna",
     "name": "Anna und die wilden Tiere",
     "search": "Anna und die wilden Tiere",
     "color": "#5f7d1c",
-    "category": "podcasts"
+    "category": "podcasts",
+    "ai": false
   },
   {
     "id": "ole",
     "name": "Ole schaut hin",
     "search": "Ole schaut hin",
     "color": "#a0522d",
-    "category": "podcasts"
+    "category": "podcasts",
+    "ai": false
   },
   {
     "id": "laluna",
@@ -28,7 +31,8 @@
     "feedUrl": "https://cdn.audiorella.com/podcasts/1786-laluna-traumreisen-zum-einschlafen/feed.rss",
     "skipAds": true,
     "color": "#43479a",
-    "category": "gutenacht"
+    "category": "gutenacht",
+    "ai": true
   },
   {
     "id": "bleib-entspannt",
@@ -38,6 +42,7 @@
     "hideTitle": "^(?!.*kinder).*erwachsene",
     "skipAds": true,
     "color": "#2d6177",
-    "category": "gutenacht"
+    "category": "gutenacht",
+    "ai": true
   }
 ]

@@ -2,7 +2,7 @@ name: Folgen vorab analysieren
 
 on:
   schedule:
-    - cron: "17 */6 * * *" # alle 6 Stunden (läuft bis zu 5 Stunden, solange das Kontingent reicht)
+    - cron: "17 */2 * * *" # alle 2 Stunden (läuft bis zu 5 Stunden; ist nichts zu tun, endet er nach einer Minute)
   workflow_dispatch:
 
 permissions:

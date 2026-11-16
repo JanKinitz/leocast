@@ -16,9 +16,12 @@ const MAX_RUNTIME_MS = Number(process.env.MAX_RUNTIME_MS || 5 * 60 * 60 * 1000);
 const PROMPT_VERSION = 4; // wie in app/api/analyze/route.ts
 const RETRY_ERRORS_AFTER = 7 * 24 * 3600 * 1000;
 
-const podcasts = JSON.parse(readFileSync(new URL("../lib/default-podcasts.json", import.meta.url), "utf8"));
-const extraFile = new URL("../lib/extra-feeds.json", import.meta.url);
-const extra = existsSync(extraFile) ? JSON.parse(readFileSync(extraFile, "utf8")) : [];
+// Welche Podcasts? Die Eltern schalten „Sprungmarken mit KI“ je Podcast im Elternbereich ein (über den Abgleich gespeichert)
+const listRes = await fetch(`${BASE}/api/analyse-list`).then((r) => r.json()).catch(() => null);
+const podcasts =
+  listRes?.podcasts ||
+  JSON.parse(readFileSync(new URL("../lib/default-podcasts.json", import.meta.url), "utf8")).filter((p) => p.ai);
+console.log(`Podcasts mit KI-Sprungmarken (${listRes?.source || "Grundeinstellung"}): ${podcasts.map((p) => p.name).join(", ")}`);
 
 export const hashUrl = (url) => createHash("sha1").update(url.trim()).digest("hex");
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -79,6 +82,7 @@ const save = () => {
     index.stats = stats.map((p) => {
       const done = p.hashes.map((h) => index.entries[h]).filter((e) => e && !e.error && (e.pv || 0) >= PROMPT_VERSION);
       return {
+        id: p.id,
         name: p.name,
         category: p.category,
         total: p.hashes.length,
@@ -109,7 +113,7 @@ publish();
 // Warteschlange: pro Podcast die neuesten Folgen, abwechselnd zwischen den Podcasts
 const lists = [];
 stats = [];
-for (const p of [...podcasts, ...extra]) {
+for (const p of podcasts) {
   try {
     const url = await feedUrlFor(p);
     if (!url) continue;

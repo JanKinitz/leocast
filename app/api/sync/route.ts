@@ -4,7 +4,8 @@
 // (kostenloses Kontingent: 2.000 Schreibvorgänge im Monat).
 import { createHash } from "node:crypto";
 import { head, put } from "@vercel/blob";
-import { emptyState, mergeStates, normalizeCode, sameState, type SyncState } from "@/lib/syncCore";
+import { analyseList, emptyState, mergeStates, normalizeCode, sameState, type SyncState } from "@/lib/syncCore";
+import defaults from "@/lib/default-podcasts.json";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -13,6 +14,18 @@ const noStore = { "Cache-Control": "no-store" };
 const MAX_BYTES = 900_000;
 
 const pathFor = (code: string) => `sync/${createHash("sha256").update(`leocast:${code}`).digest("hex")}.json`;
+
+const LIST_PATH = "config/analyse-list.json";
+
+async function loadJson<T>(path: string): Promise<T | null> {
+  try {
+    const meta = await head(path);
+    const res = await fetch(`${meta.url}?t=${Date.now()}`, { cache: "no-store" });
+    return res.ok ? ((await res.json()) as T) : null;
+  } catch {
+    return null;
+  }
+}
 
 async function load(path: string): Promise<SyncState> {
   try {
@@ -59,6 +72,18 @@ export async function POST(request: Request) {
       cacheControlMaxAge: 60,
     });
     wrote = true;
+    // Liste für die Vorab-Analyse mitpflegen (nur Podcast-Namen und Feed-Adressen, keine Familiendaten)
+    const list = analyseList(merged, defaults);
+    const storedList = await loadJson<{ podcasts: unknown }>(LIST_PATH);
+    if (JSON.stringify(storedList?.podcasts) !== JSON.stringify(list)) {
+      await put(LIST_PATH, JSON.stringify({ podcasts: list, updated: new Date().toISOString() }), {
+        access: "public",
+        addRandomSuffix: false,
+        allowOverwrite: true,
+        contentType: "application/json",
+        cacheControlMaxAge: 60,
+      });
+    }
   }
   return Response.json({ state: merged, wrote }, { headers: noStore });
 }

@@ -4,7 +4,7 @@
 // 1. KI-Analyse der echten Audiodatei (/api/analyze) – Zeiten inklusive Werbung, für alle MP3-Podcasts
 // 2. Ersatz: Kapitel oder Transkript (/api/markers) – Zeiten ohne eingefügte Werbung
 // 3. Ersatz: von Eltern pro Podcast eingestellter Vorspann
-import { podcastById, type MediaItem } from "./library";
+import { isAiEnabled, podcastById, type MediaItem } from "./library";
 import { read, write } from "./store";
 import { log } from "./diagnostics";
 
@@ -95,7 +95,8 @@ type IndexEntry = {
   firstWords?: string | null;
   error?: string;
 };
-type MarkerIndex = { at: number; entries: Record<string, IndexEntry> };
+export type PodcastStats = { id?: string; name: string; total: number; analysed: number; withStory: number; errors: number };
+type MarkerIndex = { at: number; entries: Record<string, IndexEntry>; stats?: PodcastStats[]; updated?: string };
 let indexJob: Promise<MarkerIndex | null> | null = null;
 
 export async function hashUrl(url: string): Promise<string> {
@@ -113,7 +114,7 @@ export function loadMarkerIndex(): Promise<MarkerIndex | null> {
       .then(async (res) => {
         if (!res.ok) return stored;
         const data = await res.json();
-        const idx: MarkerIndex = { at: Date.now(), entries: data.entries || {} };
+        const idx: MarkerIndex = { at: Date.now(), entries: data.entries || {}, stats: data.stats, updated: data.updated };
         if (typeof localStorage !== "undefined") localStorage.setItem(INDEX_KEY, JSON.stringify(idx));
         return idx;
       })
@@ -225,6 +226,8 @@ function fmt(sec: number | null | undefined) {
 /** Sprungmarken einer Folge (einmal ermittelt, dann auf dem Gerät gespeichert – auch offline nutzbar) */
 export function getMarkers(item: MediaItem): Promise<Markers | null> {
   if (item.kind !== "episode") return Promise.resolve(null);
+  // Nur für Podcasts, bei denen die Eltern „Sprungmarken mit KI“ eingeschaltet haben
+  if (!item.podcastId || !isAiEnabled(item.podcastId)) return Promise.resolve(null);
   const cached = read<Markers | null>(key(item.id), null);
   const offline = typeof navigator !== "undefined" && !navigator.onLine;
   // Ergebnisse ohne KI nur behalten, bis die KI-Analyse klappt

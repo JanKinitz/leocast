@@ -2,7 +2,7 @@
 
 // Abgleich zwischen Handy und Tablet (Familien-Schlüssel, Server: /api/sync).
 // Abgeglichen werden: Mag ich, Fortschritt, selbst hinzugefügte/ausgeblendete Podcasts, Reihen-Zuordnung,
-// Einstellungen „Vorspann“ und „Automatisch“, von Eltern korrigierte Sprungmarken.
+// Einstellungen „Sprungmarken mit KI“, „Vorspann“ und „Start“, von Eltern korrigierte Sprungmarken.
 // Pro Gerät: Name und welche Folgen dort offline gespeichert sind.
 import { getDownloads, read, setWriteHook, writeRaw } from "./store";
 import { CODE_ALPHABET, emptyState, normalizeCode, type DeviceInfo, type Stamped, type SyncState } from "./syncCore";
@@ -11,7 +11,7 @@ import { log } from "./diagnostics";
 const MAP_KEYS = ["leocast:likes", "leocast:progress", "leocast:podcast-category"];
 const LIST_KEYS = ["leocast:custom-podcasts"]; // Listen von Objekten mit id
 const SCALAR_KEYS = ["leocast:hidden-podcasts"];
-const SCALAR_PREFIXES = ["leocast:intro:", "leocast:autostory:"];
+const SCALAR_PREFIXES = ["leocast:intro:", "leocast:autostory:", "leocast:ai:"];
 const CORRECTION_PREFIX = "leocast:markers3:"; // nur von Eltern korrigierte Sprungmarken
 
 const META = "leocast:sync-meta";

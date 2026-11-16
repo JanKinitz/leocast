@@ -64,3 +64,34 @@ export function normalizeCode(input: string): string | null {
   if (raw.length !== 16 || [...raw].some((c) => !CODE_ALPHABET.includes(c))) return null;
   return raw.match(/.{4}/g)!.join("-");
 }
+
+// ---- Liste für die Vorab-Analyse (GitHub): welche Podcasts sollen Sprungmarken per KI bekommen ----
+export type AnalysePodcast = {
+  id: string;
+  name: string;
+  feedUrl?: string;
+  search?: string;
+  category: string;
+  hideTitle?: string;
+};
+
+type DefaultPodcast = AnalysePodcast & { ai?: boolean };
+
+/** Aus dem abgeglichenen Stand ableiten: feste Podcasts + eigene, jeweils nur mit eingeschalteter KI */
+export function analyseList(state: SyncState, defaults: DefaultPodcast[]): AnalysePodcast[] {
+  const flag = (id: string): boolean | null => {
+    const v = state.keys[`leocast:ai:${id}`]?._?.v;
+    return typeof v === "boolean" ? v : null;
+  };
+  const hidden = new Set((state.keys["leocast:hidden-podcasts"]?._?.v as string[] | undefined) || []);
+  const out: AnalysePodcast[] = [];
+  for (const p of defaults) {
+    if (hidden.has(p.id)) continue;
+    if (flag(p.id) ?? p.ai) out.push({ id: p.id, name: p.name, feedUrl: p.feedUrl, search: p.search, category: p.category, hideTitle: p.hideTitle });
+  }
+  for (const item of Object.values(state.keys["leocast:custom-podcasts"] || {})) {
+    const c = item.v as { id: string; name: string; feedUrl: string; category: string } | null;
+    if (c && flag(c.id)) out.push({ id: c.id, name: c.name, feedUrl: c.feedUrl, category: c.category });
+  }
+  return out;
+}
