@@ -277,7 +277,7 @@ export const FIGURES: Figure[] = [
     sound: "giggle",
     art: (
       <>
-        <path d="M24 70 Q18 40 34 36 Q32 18 50 22 Q60 8 72 22 Q90 18 88 36 Q104 42 96 70 Q104 96 80 100 H40 Q16 96 24 70z" fill="#4c8dff" />
+        <path d="M24 70 Q18 40 34 36 Q32 18 50 22 Q60 8 72 22 Q90 18 88 36 Q104 42 96 70 Q104 96 80 100 H40 Q16 96 24 70z" fill="#14b8a6" />
         <Eyes y={54} r={8} dx={14} />
         <path d="M46 74 Q60 90 74 74z" fill="#1b1d33" />
         <path d="M54 76 h4 v5 h-4z M62 76 h4 v5 h-4z" fill="#fff" />
