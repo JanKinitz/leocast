@@ -21,24 +21,17 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Zweig „markers“ holen
+      - name: Zweig „markers“ vorbereiten
         run: |
+          git config --global user.name "leocast-bot"
+          git config --global user.email "leocast-bot@users.noreply.github.com"
           if git ls-remote --exit-code --heads origin markers >/dev/null; then
             git fetch origin markers
             git worktree add out origin/markers
           else
-            mkdir out
+            git worktree add --orphan -b markers out
           fi
-      - name: Analysieren (speichert zwischendurch)
+      - name: Analysieren und laufend veröffentlichen
+        env:
+          PUBLISH: "1"
         run: node scripts/analyse-all.mjs out
-      - name: Ergebnisse veröffentlichen
-        if: always()
-        run: |
-          cd out
-          if [ ! -d .git ] && [ ! -f .git ]; then git init -q -b markers && git remote add origin "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git"; fi
-          git config user.name "leocast-bot"
-          git config user.email "leocast-bot@users.noreply.github.com"
-          git add -A
-          git diff --cached --quiet && exit 0
-          git commit -qm "Sprungmarken aktualisieren"
-          git push origin HEAD:markers

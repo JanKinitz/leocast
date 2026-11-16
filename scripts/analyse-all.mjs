@@ -5,6 +5,7 @@
 import { createHash } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
+import { execSync } from "node:child_process";
 
 const BASE = process.env.LEOCAST_URL || "https://leocast.vercel.app";
 const OUT = process.argv[2] || "markers-out";
@@ -54,6 +55,19 @@ const save = () => {
   index.updated = new Date().toISOString();
   writeFileSync(indexFile, JSON.stringify(index));
 };
+// Zwischendurch veröffentlichen, damit die App neue Sprungmarken nicht erst nach Stunden bekommt
+const publish = () => {
+  if (!process.env.PUBLISH) return;
+  try {
+    execSync('git add -A && (git diff --cached --quiet || (git commit -qm "Sprungmarken aktualisieren" && git push -q origin HEAD:markers))', {
+      cwd: OUT,
+      stdio: "inherit",
+      shell: "/bin/bash",
+    });
+  } catch (e) {
+    console.log(`Veröffentlichen fehlgeschlagen: ${e.message}`);
+  }
+};
 
 // Warteschlange: pro Podcast die neuesten Folgen, abwechselnd zwischen den Podcasts
 const lists = [];
@@ -102,7 +116,9 @@ for (const ep of queue) {
   }
   analysed++;
   save();
+  if (analysed % 3 === 0) publish();
   await sleep(PAUSE_MS);
 }
 save();
+publish();
 console.log(`Fertig: ${analysed} Folgen analysiert, ${Object.keys(index.entries).length} im Verzeichnis`);
