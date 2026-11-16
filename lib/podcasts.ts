@@ -11,6 +11,7 @@ export type Episode = {
   audioUrl: string;
   image?: string;
   durationSec?: number;
+  audioBytes?: number;
   published?: string;
   episodeType?: string;
   transcriptUrl?: string;
@@ -20,7 +21,7 @@ export type Episode = {
 
 export type Feed = { title: string; image?: string; episodes: Episode[]; loadedAt: number };
 
-const feedKey = (id: string) => `leocast:feed2:${id}`;
+const feedKey = (id: string) => `leocast:feed3:${id}`;
 const feedUrlKey = (id: string) => `leocast:feedurl:${id}`;
 
 export function cachedFeed(id: string): Feed | null {
@@ -75,6 +76,7 @@ export function loadFeed(source: PodcastSource, maxAgeMs = 30 * 60 * 1000): Prom
         audioUrl: e.audioUrl,
         image: e.image || data.image,
         durationSec: e.durationSec,
+        audioBytes: e.audioBytes,
         published: e.published,
         episodeType: e.episodeType,
         transcriptUrl: e.transcriptUrl,
@@ -119,6 +121,7 @@ export function episodeItem(ep: Episode, source: PodcastSource): MediaItem {
     image: ep.image,
     color: source.color,
     durationSec: ep.durationSec,
+    audioBytes: ep.audioBytes,
     audioUrl: ep.audioUrl,
     transcriptUrl: ep.transcriptUrl,
     transcriptType: ep.transcriptType,

@@ -14,6 +14,8 @@ export type MediaItem = {
   image?: string;
   color?: string;
   durationSec?: number;
+  /** Podcast-Folge: Dateigröße laut Feed (für die Speicher-Auswahl) */
+  audioBytes?: number;
   /** Podcast-Folge: Adresse der Audiodatei */
   audioUrl?: string;
   /** Podcast-Folge: Transkript/Kapitel für die Sprungmarke „Zur Geschichte“ */

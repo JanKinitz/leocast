@@ -9,9 +9,8 @@ import { useFeed, useOnline } from "@/components/hooks";
 import { IconBack, IconCloudDown, IconHeart } from "@/components/Icons";
 import { podcastById } from "@/lib/library";
 import { episodeItem } from "@/lib/podcasts";
-import { getDownloads, getProgress, isLiked, markDownloaded, toggleLike, useStoreVersion } from "@/lib/store";
-import { downloadEpisode, requestPersistentStorage } from "@/lib/offline";
-import { log } from "@/lib/diagnostics";
+import { getDownloads, getProgress, isLiked, toggleLike, useStoreVersion } from "@/lib/store";
+import OfflinePicker from "@/components/OfflinePicker";
 import { prefetchMarkers } from "@/lib/markers";
 import { img } from "@/lib/img";
 
@@ -21,7 +20,7 @@ export default function Sendung() {
   const source = podcastById(id);
   const { feed, error } = useFeed(source);
   const online = useOnline();
-  const [saving, setSaving] = useState<string | null>(null);
+  const [picking, setPicking] = useState(false);
 
   // Die drei neuesten Folgen vorab analysieren, damit Sprungmarken beim Abspielen schon bereitstehen
   useEffect(() => {
@@ -42,75 +41,54 @@ export default function Sendung() {
 
   const downloads = getDownloads();
   const all = (feed?.episodes || []).map((e) => episodeItem(e, source)).filter((it) => online || !!downloads[it.id]);
+  // Neue Folgen zuerst, schon gehörte dahinter (mit Haken) – alles in einer Reihe, damit es auf einen Bildschirm passt
   const fresh = all.filter((it) => !getProgress(it.id)?.finished);
   const heard = all.filter((it) => getProgress(it.id)?.finished);
   const liked = isLiked(`pod:${source.id}`);
-  const notSaved = fresh.filter((it) => !downloads[it.id]).slice(0, 3);
-
-  async function saveForLater() {
-    await requestPersistentStorage();
-    for (const it of notSaved) {
-      setSaving(it.id);
-      const { result, detail } = await downloadEpisode(it.audioUrl!);
-      if (result !== "failed") {
-        markDownloaded(it, result);
-        prefetchMarkers(it);
-      }
-      log(result === "failed" ? "error" : "ok", `Offline „${it.title}“: ${result} – ${detail}`);
-    }
-    setSaving(null);
-  }
+  const savedCount = all.filter((it) => downloads[it.id]).length;
+  const logo = feed?.image || source.image;
 
   return (
-    <main className="page world" style={{ ["--world" as string]: source.color }}>
-      <header className="world-top">
+    <main className="page world world-fit" style={{ ["--world" as string]: source.color }}>
+      <header className="world-head">
         <Link href="/" className="round-btn back-btn" aria-label="Zurück">
           <IconBack />
         </Link>
-        <span className="world-name">{source.name}</span>
+        <div className="world-logo small" style={{ background: source.color }}>
+          {logo && <img src={img(logo, 256)} alt="" />}
+        </div>
+        <h1 className="world-title">{source.name}</h1>
       </header>
 
-      <div className="world-hero">
-        <div className="world-logo" style={{ background: source.color }}>
-          {feed?.image && <img src={img(feed.image, 640)} alt="" />}
-        </div>
-        <h1 className="world-title">{feed?.title || source.name}</h1>
-        <div className="world-actions">
-          <button
-            className={`chip ${liked ? "on" : ""}`}
-            aria-pressed={liked}
-            onClick={() => toggleLike(`pod:${source.id}`, { podcastId: source.id, title: source.name, image: feed?.image })}
-          >
-            <IconHeart filled={liked} />
-            Mag ich
+      <div className="world-actions">
+        <button
+          className={`chip ${liked ? "on" : ""}`}
+          aria-pressed={liked}
+          onClick={() => toggleLike(`pod:${source.id}`, { podcastId: source.id, title: source.name, image: feed?.image })}
+        >
+          <IconHeart filled={liked} />
+          Mag ich
+        </button>
+        {online && all.length > 0 && (
+          <button className="chip" onClick={() => setPicking(true)}>
+            <IconCloudDown />
+            {savedCount ? `Unterwegs (${savedCount})` : "Für unterwegs"}
           </button>
-          {online && notSaved.length > 0 && (
-            <button className="chip" onClick={saveForLater} disabled={!!saving}>
-              <IconCloudDown />
-              {saving ? "Speichere…" : "Für unterwegs speichern"}
-            </button>
-          )}
-        </div>
+        )}
       </div>
 
       {!feed && !error && <p className="hint">Lade Folgen…</p>}
       {error && !feed && <p className="hint">Die Folgen lassen sich gerade nicht laden.</p>}
 
-      {fresh.length > 0 && (
-        <Rail title={online ? "Neueste Folgen" : "Ohne Internet hörbar"}>
-          {fresh.map((it) => (
+      {all.length > 0 && (
+        <Rail title={online ? "Folgen" : "Ohne Internet hörbar"}>
+          {[...fresh, ...heard].map((it) => (
             <PlayTile key={it.id} item={it} more={all} wide />
           ))}
         </Rail>
       )}
 
-      {heard.length > 0 && (
-        <Rail title="Schon gehört">
-          {heard.map((it) => (
-            <PlayTile key={it.id} item={it} more={all} />
-          ))}
-        </Rail>
-      )}
+      {picking && <OfflinePicker items={all} onClose={() => setPicking(false)} />}
     </main>
   );
 }

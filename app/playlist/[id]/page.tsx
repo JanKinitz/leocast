@@ -50,19 +50,16 @@ export default function PlaylistPage() {
   const color = pl ? colorFor(pl.name) : "#3b2f6b";
 
   return (
-    <main className="page world" style={{ ["--world" as string]: color }}>
-      <header className="world-top">
+    <main className="page world world-fit" style={{ ["--world" as string]: color }}>
+      <header className="world-head">
         <Link href="/" className="round-btn back-btn" aria-label="Zurück">
           <IconBack />
         </Link>
-        <span className="world-name">{pl?.name || "Lieder"}</span>
-      </header>
-      <div className="world-hero">
-        <div className="world-logo square" style={{ background: color }}>
-          {pl?.images?.[0]?.url && <img src={img(pl.images[0].url, 640)} alt="" />}
+        <div className="world-logo small square" style={{ background: color }}>
+          {pl?.images?.[0]?.url && <img src={img(pl.images[0].url, 256)} alt="" />}
         </div>
-        <h1 className="world-title">{pl?.name || ""}</h1>
-      </div>
+        <h1 className="world-title">{pl?.name || "Lieder"}</h1>
+      </header>
       {error && <p className="hint">{error}</p>}
       {items.length > 0 && (
         <Rail title="Lieder">
