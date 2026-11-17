@@ -152,7 +152,12 @@ for (let qi = 0; qi < queue.length; qi++) {
   const known = index.entries[h];
   // Fehler erneut versuchen – außer bei Folgen, die grundsätzlich nicht gehen (kein MP3)
   // neu prüfen, wenn die Erkennung seitdem verbessert wurde (Version der Anweisung)
-  const retryNoStory = known && !known.error && (known.pv || 0) < PROMPT_VERSION;
+  // Geschichte nicht gefunden, weil am Ende des Fensters noch entspannt wurde: einmal mit Verlängerung nachholen
+  const segFile = join(OUT, "segments", `${h}.json`);
+  const endsRelaxed =
+    known && !known.error && known.storyStart == null && (known.window || 0) <= 480 && existsSync(segFile) &&
+    JSON.parse(readFileSync(segFile, "utf8")).slice(-4).some((x) => x.l === "E");
+  const retryNoStory = (known && !known.error && (known.pv || 0) < PROMPT_VERSION) || endsRelaxed;
   if (known && !retryNoStory && (!known.error || (/MP3/.test(known.error) && Date.now() - known.at < RETRY_ERRORS_AFTER))) continue;
 
   // Wissens-Podcasts: nur die ersten 2,5 Minuten (Werbung erkennen), einen Sprung zur Geschichte gibt es dort nicht

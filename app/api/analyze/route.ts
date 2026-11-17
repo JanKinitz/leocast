@@ -7,6 +7,7 @@ export const maxDuration = 120;
 export const preferredRegion = "fra1";
 
 const WINDOW_SEC = 480; // erste 8 Minuten: bei LALUNA beginnt die Geschichte erst nach Werbung, Wünschen und Ritual
+const EXTRA_SEC = 240; // Verlängerung, falls die Geschichte nach 8 Minuten noch nicht begonnen hat
 const MAX_BYTES = 24 * 1024 * 1024; // Groq (kostenlos): Dateien bis 25 MB
 const GROQ = "https://api.groq.com/openai/v1";
 const UA = "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Mobile Safari/537.36";
@@ -235,10 +236,28 @@ export async function GET(request: Request) {
 
     const end = Math.min(id3 + Math.round((kbps * 1000 * windowSec) / 8), MAX_BYTES) - 1;
     const part = await fetchRange(audio, 0, end);
-    const segs = (await transcribe(part.bytes, key)).filter((s) => s.text);
+    const segs: Seg[] = (await transcribe(part.bytes, key)).filter((s) => s.text);
     if (segs.length < 3) throw new Error("Zu wenig Sprache erkannt");
 
-    const d = await decide(segs, key, title, show);
+    let d = await decide(segs, key, title, show);
+    // Läuft am Ende des Fensters noch die Entspannung (lange Werbung + langer Vorspann, z. B. „Bleib entspannt!“),
+    // die nächsten 4 Minuten nachladen und noch einmal entscheiden
+    let analysedSec = windowSec;
+    if (d.story == null && d.labels.slice(-4).includes("E") && windowSec >= 300) {
+      const bytesPerSec = (kbps * 1000) / 8;
+      const from = end + 1;
+      const to = Math.min(from + Math.round(bytesPerSec * EXTRA_SEC), MAX_BYTES * 2) - 1;
+      const more = await fetchRange(audio, from, to);
+      const offset = (from - id3) / bytesPerSec;
+      const extra = (await transcribe(more.bytes, key))
+        .filter((x) => x.text)
+        .map((x) => ({ ...x, start: x.start + offset, end: x.end + offset }));
+      if (extra.length) {
+        segs.push(...extra);
+        d = await decide(segs, key, title, show);
+        analysedSec = windowSec + EXTRA_SEC;
+      }
+    }
     const total = head.total ?? part.total;
     const totalSec = total ? Math.round(((total - id3) * 8) / (kbps * 1000)) : null;
     const story = d.story != null ? segs[d.story].start : null;
@@ -253,7 +272,7 @@ export async function GET(request: Request) {
         firstWords: d.story != null ? segs[d.story].text.slice(0, 120) : null,
         reason: d.reason,
         model: d.model,
-        window: windowSec,
+        window: analysedSec,
         pv: PROMPT_VERSION,
         ...(d.warnings.length ? { warnings: d.warnings.map((w) => w.slice(0, 300)) } : {}),
         // Zum Nachprüfen im Elternbereich: Abschnitte mit Zeit und Einordnung
