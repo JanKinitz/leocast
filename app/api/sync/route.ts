@@ -60,9 +60,10 @@ export async function GET(request: Request) {
   const names = Object.keys(process.env).filter((n) => /BLOB|READ_WRITE|OIDC/i.test(n));
   let sdk = "?";
   try {
-    sdk = (await import("@vercel/blob/package.json")).version;
-  } catch {
-    /* egal */
+    const { createRequire } = await import("node:module");
+    sdk = createRequire(import.meta.url)("@vercel/blob/package.json").version;
+  } catch (e) {
+    sdk = `? ${(e as Error).message.slice(0, 80)}`;
   }
   return Response.json(
     {
