@@ -57,8 +57,22 @@ export async function GET(request: Request) {
     }
   }
   // Zur Fehlersuche nur die Namen passender Variablen (nie die Werte)
-  const names = Object.keys(process.env).filter((n) => /BLOB|READ_WRITE/i.test(n));
-  return Response.json({ configured: blobConfigured(), variables: names }, { headers: noStore });
+  const names = Object.keys(process.env).filter((n) => /BLOB|READ_WRITE|OIDC/i.test(n));
+  let sdk = "?";
+  try {
+    sdk = (await import("@vercel/blob/package.json")).version;
+  } catch {
+    /* egal */
+  }
+  return Response.json(
+    {
+      configured: blobConfigured(),
+      variables: names,
+      oidcHeader: request.headers.has("x-vercel-oidc-token"),
+      sdk,
+    },
+    { headers: noStore },
+  );
 }
 
 export async function POST(request: Request) {
