@@ -2,7 +2,7 @@
 // und gibt das Ergebnis zurück. Gespeichert wird in Vercel Blob unter einem festen Pfad (alle Geräte der Familie).
 // Geschrieben wird nur, wenn sich wirklich etwas geändert hat (kostenloses Kontingent: 2.000 Schreibvorgänge im Monat).
 import { createHash } from "node:crypto";
-import { blobToken } from "@/lib/blobToken";
+import { blobConfigured, blobToken } from "@/lib/blobToken";
 import { head, put } from "@vercel/blob";
 import { analyseList, emptyState, mergeStates, normalizeCode, sameState, type SyncState } from "@/lib/syncCore";
 import defaults from "@/lib/default-podcasts.json";
@@ -40,14 +40,29 @@ async function load(path: string): Promise<SyncState> {
   }
 }
 
-export async function GET() {
+export async function GET(request: Request) {
+  // ?test=1: einmal wirklich schreiben, um die Verbindung zum Speicher zu prüfen
+  if (new URL(request.url).searchParams.get("test")) {
+    try {
+      await put("config/test.json", JSON.stringify({ at: new Date().toISOString() }), {
+        access: "public",
+        addRandomSuffix: false,
+        allowOverwrite: true,
+        contentType: "application/json",
+        token: blobToken(),
+      });
+      return Response.json({ ok: true }, { headers: noStore });
+    } catch (e) {
+      return Response.json({ ok: false, error: (e as Error).message }, { status: 500, headers: noStore });
+    }
+  }
   // Zur Fehlersuche nur die Namen passender Variablen (nie die Werte)
   const names = Object.keys(process.env).filter((n) => /BLOB|READ_WRITE/i.test(n));
-  return Response.json({ configured: Boolean(blobToken()), variables: names }, { headers: noStore });
+  return Response.json({ configured: blobConfigured(), variables: names }, { headers: noStore });
 }
 
 export async function POST(request: Request) {
-  if (!blobToken())
+  if (!blobConfigured())
     return Response.json({ error: "Abgleich ist noch nicht eingerichtet" }, { status: 503, headers: noStore });
 
   const raw = await request.text();

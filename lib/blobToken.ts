@@ -10,3 +10,8 @@ export function blobToken(): string | undefined {
   }
   return undefined;
 }
+
+/** Speicher verfügbar? Neue Vercel-Speicher melden sich ohne festen Schlüssel an (OIDC + BLOB_STORE_ID) */
+export function blobConfigured(): boolean {
+  return Boolean(blobToken() || process.env.BLOB_STORE_ID || Object.keys(process.env).some((n) => /_STORE_ID$/.test(n) && /BLOB/.test(n)));
+}
