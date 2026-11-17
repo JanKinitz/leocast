@@ -5,15 +5,27 @@
 import { isAppPlaying } from "./appState";
 
 let ctx: AudioContext | null = null;
+let out: AudioNode | null = null;
 
+// Handylautsprecher geben tiefe Töne kaum wieder: alles läuft über einen Kompressor und ist lauter abgemischt
 function audio(): AudioContext | null {
   if (typeof window === "undefined") return null;
   const AC = window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
   if (!AC) return null;
-  ctx ||= new AC();
-  if (ctx.state === "suspended") ctx.resume().catch(() => {});
+  if (!ctx) {
+    ctx = new AC();
+    const comp = ctx.createDynamicsCompressor();
+    comp.threshold.value = -18;
+    comp.ratio.value = 4;
+    const master = ctx.createGain();
+    master.gain.value = 1.6;
+    comp.connect(master).connect(ctx.destination);
+    out = comp;
+  }
   return ctx;
 }
+
+const dest = () => out || ctx!.destination;
 
 type Tone = { type?: OscillatorType; from: number; to?: number; at?: number; dur: number; vol?: number; vibrato?: number };
 
@@ -37,11 +49,11 @@ function tones(list: Tone[]) {
       lfo.start(start);
       lfo.stop(start + t.dur);
     }
-    const v = (t.vol ?? 1) * 0.18;
+    const v = (t.vol ?? 1) * 0.45;
     gain.gain.setValueAtTime(0.0001, start);
     gain.gain.exponentialRampToValueAtTime(v, start + 0.02);
     gain.gain.exponentialRampToValueAtTime(0.0001, start + t.dur);
-    osc.connect(gain).connect(ac.destination);
+    osc.connect(gain).connect(dest());
     osc.start(start);
     osc.stop(start + t.dur + 0.05);
   }
@@ -60,14 +72,14 @@ function noise(dur: number, freq: number, at = 0, vol = 1) {
   filter.frequency.value = freq;
   const gain = ac.createGain();
   const start = ac.currentTime + 0.02 + at;
-  gain.gain.setValueAtTime(0.12 * vol, start);
+  gain.gain.setValueAtTime(0.5 * vol, start);
   gain.gain.exponentialRampToValueAtTime(0.0001, start + dur);
-  src.connect(filter).connect(gain).connect(ac.destination);
+  src.connect(filter).connect(gain).connect(dest());
   src.start(start);
 }
 
 export const SOUNDS = {
-  boing: () => tones([{ type: "triangle", from: 180, to: 520, dur: 0.35, vibrato: 25 }]),
+  boing: () => tones([{ type: "triangle", from: 330, to: 880, dur: 0.35, vibrato: 40 }, { from: 660, to: 1320, dur: 0.3, vol: 0.4 }]),
   huuu: () => tones([{ from: 520, to: 260, dur: 1.1, vibrato: 18, vol: 0.8 }]),
   pop: () => tones([{ type: "triangle", from: 600, to: 1200, dur: 0.09 }, { from: 900, to: 400, at: 0.1, dur: 0.12 }]),
   bells: () =>
@@ -81,20 +93,21 @@ export const SOUNDS = {
     noise(0.35, 1800, 0.62, 1.2);
     tones([{ type: "triangle", from: 1500, to: 700, at: 0.64, dur: 0.25, vol: 0.5 }]);
   },
-  honk: () => tones([{ type: "square", from: 330, dur: 0.18, vol: 0.4 }, { type: "square", from: 330, at: 0.22, dur: 0.25, vol: 0.4 }]),
-  buzz: () => tones([{ type: "sawtooth", from: 190, to: 230, dur: 0.7, vibrato: 30, vol: 0.35 }]),
-  ribbit: () => tones([{ type: "square", from: 140, to: 90, dur: 0.14, vol: 0.4 }, { type: "square", from: 160, to: 100, at: 0.18, dur: 0.16, vol: 0.4 }]),
+  honk: () => tones([{ type: "square", from: 440, dur: 0.18, vol: 0.5 }, { type: "square", from: 440, at: 0.22, dur: 0.25, vol: 0.5 }]),
+  buzz: () => tones([{ type: "sawtooth", from: 380, to: 440, dur: 0.8, vibrato: 40, vol: 0.45 }]),
+  ribbit: () => tones([{ type: "square", from: 420, to: 260, dur: 0.14, vol: 0.5 }, { type: "square", from: 480, to: 300, at: 0.18, dur: 0.16, vol: 0.5 }]),
   hoot: () => tones([{ from: 420, to: 380, dur: 0.3 }, { from: 420, to: 360, at: 0.4, dur: 0.45 }]),
   beep: () => tones([{ type: "square", from: 880, dur: 0.1, vol: 0.3 }, { type: "square", from: 1320, at: 0.13, dur: 0.1, vol: 0.3 }, { type: "square", from: 660, at: 0.26, dur: 0.16, vol: 0.3 }]),
-  roar: () => tones([{ type: "sawtooth", from: 110, to: 70, dur: 0.6, vibrato: 12, vol: 0.4 }]),
+  roar: () => tones([{ type: "sawtooth", from: 340, to: 200, dur: 0.7, vibrato: 30, vol: 0.55 }, { type: "square", from: 170, to: 110, dur: 0.6, vol: 0.35 }]),
   chime: () => tones([{ from: 784, dur: 0.4 }, { from: 988, at: 0.12, dur: 0.4 }, { from: 1175, at: 0.24, dur: 0.6 }]),
   splash: () => noise(0.5, 900),
   giggle: () =>
     tones([0, 0.11, 0.22, 0.33].map((at, i) => ({ type: "triangle" as OscillatorType, from: 700 + i * 60, to: 950 + i * 60, at, dur: 0.09 }))),
   whoosh: () => noise(0.6, 600),
   sniff: () => {
-    noise(0.12, 2500);
-    noise(0.12, 2500, 0.18);
+    noise(0.14, 2200, 0, 1.5);
+    noise(0.14, 2200, 0.2, 1.5);
+    tones([{ type: "triangle", from: 900, to: 1400, at: 0.42, dur: 0.12, vol: 0.6 }]);
   },
   tick: () => tones([{ type: "square", from: 1500, dur: 0.05, vol: 0.3 }, { type: "square", from: 1200, at: 0.12, dur: 0.05, vol: 0.3 }]),
 };
@@ -103,9 +116,16 @@ export type SoundName = keyof typeof SOUNDS;
 
 export function playSound(name: SoundName) {
   if (isAppPlaying()) return;
-  try {
-    SOUNDS[name]();
-  } catch {
-    /* kein Ton – egal */
-  }
+  const ac = audio();
+  if (!ac) return;
+  const go = () => {
+    try {
+      SOUNDS[name]();
+    } catch {
+      /* kein Ton – egal */
+    }
+  };
+  // Erst spielen, wenn der Ton-Kanal wirklich läuft (Android startet ihn erst nach dem Antippen)
+  if (ac.state === "running") go();
+  else ac.resume().then(go).catch(() => {});
 }
