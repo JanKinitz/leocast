@@ -1,10 +1,16 @@
 // KI-Analyse einer Folge: die ersten Minuten der echten Audiodatei abschreiben lassen (Whisper bei Groq)
 // und ein Sprachmodell bestimmen lassen, wo Werbung endet und wo die eigentliche Geschichte beginnt.
 // Zeiten beziehen sich auf die tatsächliche Audiodatei (mit Werbung). Ergebnis wird 30 Tage im CDN gespeichert.
+import filter from "@/lib/content-filter.json";
+
 export const runtime = "nodejs";
 export const maxDuration = 120;
 // Aus Frankfurt laden, damit die eingefügte Werbung der auf den Geräten in Deutschland entspricht
 export const preferredRegion = "fra1";
+
+const SNAKE = new RegExp(filter.snake, "i");
+const SNAKE_IGNORE = new RegExp(filter.snakeIgnore, "gi");
+const mentionsSnake = (t: string) => SNAKE.test(t.toLowerCase().replace(SNAKE_IGNORE, " "));
 
 const WINDOW_SEC = 480; // erste 8 Minuten: bei LALUNA beginnt die Geschichte erst nach Werbung, Wünschen und Ritual
 const EXTRA_SEC = 240; // Verlängerung, falls die Geschichte nach 8 Minuten noch nicht begonnen hat
@@ -112,11 +118,24 @@ den Inhalt, nicht auf genaue Formulierungen.
 - CheckPod: keine Fremdwerbung, nur ein kurzes Intro mit Erkennungsmelodie (I), dann direkt das Thema (G).
   Wenn es keine Fremdwerbung gibt, darf es auch keinen W-Block geben.
 
+Außerdem: Kommt in den Abschnitten (außer in der Fremdwerbung) eine Schlange vor oder wird sie angekündigt – als Tier,
+als Figur oder als Thema der Folge (auch Kobra, Python, Natter, Viper, Boa, Anakonda usw.)? Dann "snake": true.
+„Schlange stehen“ (warten) zählt nicht.
+
 Antworte nur mit kurzem JSON. Für jeden Block nur die Nummer des ERSTEN Abschnitts und den Typ, in Reihenfolge, z. B.:
 {"blocks":[{"from":0,"type":"W"},{"from":4,"type":"I"},{"from":11,"type":"E"},{"from":27,"type":"G"}],
-"reason":"<ein kurzer Satz, woran du den Beginn der Geschichte erkennst>"}`;
+"reason":"<ein kurzer Satz, woran du den Beginn der Geschichte erkennst>","snake":false}`;
 
-type Decision = { content: number; story: number | null; relax: number | null; reason: string; labels: string; model: string; warnings: string[] };
+type Decision = {
+  content: number;
+  story: number | null;
+  relax: number | null;
+  reason: string;
+  labels: string;
+  model: string;
+  warnings: string[];
+  snake: boolean;
+};
 
 async function decide(segs: Seg[], key: string, title: string, show: string): Promise<Decision> {
   const lines = segs
@@ -152,7 +171,7 @@ async function decide(segs: Seg[], key: string, title: string, show: string): Pr
       continue;
     }
     const data = await res.json();
-    let out: { blocks?: { from?: number; type?: string }[]; reason?: string } = {};
+    let out: { blocks?: { from?: number; type?: string }[]; reason?: string; snake?: unknown } = {};
     const choice = data.choices?.[0];
     const text: string = choice?.message?.content || "";
     // JSON aus der Antwort herauslösen (manche Modelle schreiben Text oder Denkblöcke drumherum)
@@ -177,7 +196,14 @@ async function decide(segs: Seg[], key: string, title: string, show: string): Pr
       const b = [...blocks].reverse().find((x) => x.from <= i) || blocks[0];
       labels += b.type;
     }
-    return { ...fromLabels(labels, segs), reason: String(out.reason || "").slice(0, 200), labels, model, warnings: errors };
+    return {
+      ...fromLabels(labels, segs),
+      reason: String(out.reason || "").slice(0, 200),
+      labels,
+      model,
+      warnings: errors,
+      snake: out.snake === true || out.snake === "true",
+    };
   }
   throw Object.assign(new Error(`Sprachmodell nicht erreichbar (${errors.join(" | ")})`), {
     status: limited === models.length ? 429 : 502,
@@ -262,6 +288,9 @@ export async function GET(request: Request) {
     const totalSec = total ? Math.round(((total - id3) * 8) / (kbps * 1000)) : null;
     const story = d.story != null ? segs[d.story].start : null;
     const content = segs[d.content].start;
+    // Schlange im Anfang? (Wortsuche im abgeschriebenen Text außerhalb der Werbung, oder Einschätzung des Sprachmodells)
+    const snakeWords = segs.filter((x, i) => d.labels[i] !== "W" && mentionsSnake(x.text)).map((x) => x.text);
+    const snake = d.snake || snakeWords.length > 0;
     return Response.json(
       {
         source: "ki",
@@ -274,6 +303,8 @@ export async function GET(request: Request) {
         model: d.model,
         window: analysedSec,
         pv: PROMPT_VERSION,
+        snake,
+        ...(snakeWords.length ? { snakeWords: snakeWords.slice(0, 3).map((w) => w.slice(0, 120)) } : {}),
         ...(d.warnings.length ? { warnings: d.warnings.map((w) => w.slice(0, 300)) } : {}),
         // Zum Nachprüfen im Elternbereich: Abschnitte mit Zeit und Einordnung
         ...(debug ? { segments: segs.map((x, i) => ({ t: Math.round(x.start), l: d.labels[i], text: x.text })) } : {}),

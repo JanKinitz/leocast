@@ -4,6 +4,8 @@
 import type { MediaItem, PodcastSource } from "./library";
 import { read, write } from "./store";
 import { log } from "./diagnostics";
+import { hashUrl, loadMarkerIndex } from "./markers";
+import filter from "./content-filter.json";
 
 export type Episode = {
   guid: string;
@@ -58,10 +60,31 @@ async function resolveFeedUrl(source: PodcastSource): Promise<string> {
 
 const inflight = new Map<string, Promise<Feed>>();
 
+const SNAKE = new RegExp(filter.snake, "i");
+const SNAKE_IGNORE = new RegExp(filter.snakeIgnore, "gi");
+/** Kommt eine Schlange vor? („Schlange stehen“ zählt nicht) */
+export function mentionsSnake(text: string): boolean {
+  return SNAKE.test(text.toLowerCase().replace(SNAKE_IGNORE, " "));
+}
+
+/** Folgen ausblenden, die die Vorab-Analyse markiert hat (z. B. Schlange am Anfang) */
+async function dropHidden(feed: Feed): Promise<Feed> {
+  try {
+    const idx = await loadMarkerIndex();
+    const hidden = idx?.hidden;
+    if (!hidden || !Object.keys(hidden).length) return feed;
+    const keep: Episode[] = [];
+    for (const e of feed.episodes) if (!hidden[await hashUrl(e.audioUrl)]) keep.push(e);
+    return keep.length === feed.episodes.length ? feed : { ...feed, episodes: keep };
+  } catch {
+    return feed;
+  }
+}
+
 export function loadFeed(source: PodcastSource, maxAgeMs = 30 * 60 * 1000): Promise<Feed> {
   const cached = cachedFeed(source.id);
-  if (cached && Date.now() - cached.loadedAt < maxAgeMs) return Promise.resolve(cached);
-  if (typeof navigator !== "undefined" && !navigator.onLine && cached) return Promise.resolve(cached);
+  if (cached && Date.now() - cached.loadedAt < maxAgeMs) return dropHidden(cached);
+  if (typeof navigator !== "undefined" && !navigator.onLine && cached) return dropHidden(cached);
   const existing = inflight.get(source.id);
   if (existing) return existing;
   const p = (async () => {
@@ -86,7 +109,12 @@ export function loadFeed(source: PodcastSource, maxAgeMs = 30 * 60 * 1000): Prom
       const before = episodes.length;
       episodes = episodes.filter((e) => isRealContent(e) && !(source.hideTitle && source.hideTitle.test(e.title)));
       if (before !== episodes.length) log("info", `„${source.name}“: ${before - episodes.length} Folgen ohne echten Inhalt ausgeblendet`);
-      const feed: Feed = { title: data.title, image: data.image, episodes: episodes.slice(0, 60), loadedAt: Date.now() };
+      // Folgen mit Schlangen ausblenden (Titel oder Beschreibung)
+      const descr = new Map<string, string>((data.episodes || []).map((e: any) => [e.guid, String(e.description || "")]));
+      const n = episodes.length;
+      episodes = episodes.filter((e) => !mentionsSnake(`${e.title} ${descr.get(e.guid) || ""}`));
+      if (n !== episodes.length) log("info", `„${source.name}“: ${n - episodes.length} Folgen mit Schlange ausgeblendet`);
+      const feed = await dropHidden({ title: data.title, image: data.image, episodes, loadedAt: Date.now() });
       write(feedKey(source.id), feed);
       return feed;
     } catch (e) {

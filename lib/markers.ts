@@ -95,8 +95,23 @@ type IndexEntry = {
   firstWords?: string | null;
   error?: string;
 };
-export type PodcastStats = { id?: string; name: string; total: number; analysed: number; withStory: number; errors: number };
-type MarkerIndex = { at: number; entries: Record<string, IndexEntry>; stats?: PodcastStats[]; updated?: string };
+export type PodcastStats = {
+  id?: string;
+  name: string;
+  total: number;
+  analysed: number;
+  withStory: number;
+  errors: number;
+  hidden?: number;
+};
+type MarkerIndex = {
+  at: number;
+  entries: Record<string, IndexEntry>;
+  stats?: PodcastStats[];
+  updated?: string;
+  /** Ausgeblendete Folgen (Hash der Audio-Adresse → Grund, z. B. „schlange“) */
+  hidden?: Record<string, string>;
+};
 let indexJob: Promise<MarkerIndex | null> | null = null;
 
 export async function hashUrl(url: string): Promise<string> {
@@ -114,7 +129,13 @@ export function loadMarkerIndex(): Promise<MarkerIndex | null> {
       .then(async (res) => {
         if (!res.ok) return stored;
         const data = await res.json();
-        const idx: MarkerIndex = { at: Date.now(), entries: data.entries || {}, stats: data.stats, updated: data.updated };
+        const idx: MarkerIndex = {
+          at: Date.now(),
+          entries: data.entries || {},
+          stats: data.stats,
+          updated: data.updated,
+          hidden: data.hidden,
+        };
         if (typeof localStorage !== "undefined") localStorage.setItem(INDEX_KEY, JSON.stringify(idx));
         return idx;
       })

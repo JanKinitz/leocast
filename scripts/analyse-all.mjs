@@ -9,7 +9,8 @@ import { execSync } from "node:child_process";
 
 const BASE = process.env.LEOCAST_URL || "https://leocast.vercel.app";
 const OUT = process.argv[2] || "markers-out";
-const PER_PODCAST = Number(process.env.PER_PODCAST || 60); // so viele Folgen zeigt die App je Podcast
+// Die App zeigt alle Folgen eines Podcasts; zum Testen lässt sich die Zahl begrenzen
+const PER_PODCAST = Number(process.env.PER_PODCAST || Infinity);
 // Kostenloses Groq-Kontingent: max. 2 Stunden Audio pro Stunde, 8 Minuten pro Folge → höchstens 15 Folgen pro Stunde
 const PAUSE_MS = Number(process.env.PAUSE_MS || 245_000);
 const MAX_RUNTIME_MS = Number(process.env.MAX_RUNTIME_MS || 5 * 60 * 60 * 1000);
@@ -28,6 +29,12 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const normalize = (s) => s.toLowerCase().replace(/[^a-z0-9äöüß]+/g, " ").trim();
 const NOT_CONTENT =
   /\b(ankündigung|trailer|teaser|vorschau|pause|sommerpause|winterpause|in eigener sache|hinweis|neuigkeiten|news|update|bonus-?info)\b/i;
+
+// Folgen mit Schlangen werden in der App ausgeblendet (wie lib/podcasts.ts)
+const filter = JSON.parse(readFileSync(new URL("../lib/content-filter.json", import.meta.url), "utf8"));
+const SNAKE = new RegExp(filter.snake, "i");
+const SNAKE_IGNORE = new RegExp(filter.snakeIgnore, "gi");
+const mentionsSnake = (t) => SNAKE.test(String(t || "").toLowerCase().replace(SNAKE_IGNORE, " "));
 
 function isRealContent(e) {
   if (e.episodeType === "trailer" || e.episodeType === "bonus") return false;
@@ -74,9 +81,24 @@ for (const [h, e] of Object.entries(index.entries)) {
   }
 }
 
+// Schlangen-Regel auch auf ältere Ergebnisse anwenden (Wortsuche in den gespeicherten Abschnitten, ohne neue Analyse)
+for (const [h, e] of Object.entries(index.entries)) {
+  const file = join(OUT, "segments", `${h}.json`);
+  if (e.error || e.snake != null || !existsSync(file)) continue;
+  const words = JSON.parse(readFileSync(file, "utf8")).filter((x) => x.l !== "W" && mentionsSnake(x.text));
+  e.snake = words.length > 0;
+  if (e.snake) {
+    e.snakeWords = words.slice(0, 3).map((x) => x.text.slice(0, 120));
+    console.log(`Schlange erkannt (ältere Analyse): ${e.title}`);
+  }
+}
+
 let stats = null;
 const save = () => {
   index.updated = new Date().toISOString();
+  // Ausgeblendete Folgen für die App (Hash der Audio-Adresse → Grund)
+  index.hidden = {};
+  for (const [h, e] of Object.entries(index.entries)) if (e.snake) index.hidden[h] = "schlange";
   // Übersicht je Podcast für den Statusbericht
   if (stats)
     index.stats = stats.map((p) => {
@@ -89,6 +111,7 @@ const save = () => {
         analysed: done.length,
         withStory: done.filter((e) => e.storyStart != null).length,
         errors: p.hashes.filter((h) => index.entries[h]?.error).length,
+        hidden: p.hidden + done.filter((e) => e.snake).length,
       };
     });
   writeFileSync(indexFile, JSON.stringify(index));
@@ -120,13 +143,16 @@ for (const p of podcasts) {
     const { ok, data } = await json(`${BASE}/api/feed?url=${encodeURIComponent(url)}`);
     if (!ok) continue;
     const hide = p.hideTitle ? new RegExp(p.hideTitle, "i") : null;
-    const eps = (data.episodes || [])
-      .filter((e) => e.audioUrl && isRealContent(e) && !(hide && hide.test(e.title)))
+    const shown = (data.episodes || []).filter((e) => e.audioUrl && isRealContent(e) && !(hide && hide.test(e.title)));
+    // Schlange schon im Titel oder in der Beschreibung: blendet die App selbst aus, Analyse nicht nötig
+    const eps = shown
+      .filter((e) => !mentionsSnake(`${e.title} ${e.description || ""}`))
       .slice(0, PER_PODCAST)
       .map((e) => ({ ...e, show: p.name, night: p.category === "gutenacht" }));
+    const hiddenByText = shown.length - eps.length;
     lists.push(eps);
-    stats.push({ id: p.id, name: p.name, category: p.category, hashes: eps.map((e) => hashUrl(e.audioUrl)) });
-    console.log(`${p.name}: ${eps.length} Folgen`);
+    stats.push({ id: p.id, name: p.name, category: p.category, hidden: hiddenByText, hashes: eps.map((e) => hashUrl(e.audioUrl)) });
+    console.log(`${p.name}: ${eps.length} Folgen (${data.pages || 1} Feed-Seiten, ${hiddenByText} mit Schlange im Titel)`);
   } catch (e) {
     console.log(`${p.name}: Feed-Fehler ${e.message}`);
   }
@@ -135,7 +161,8 @@ save();
 publish();
 
 const queue = [];
-for (let i = 0; i < PER_PODCAST; i++) for (const l of lists) if (l[i]) queue.push(l[i]);
+const longest = Math.max(0, ...lists.map((l) => l.length));
+for (let i = 0; i < longest; i++) for (const l of lists) if (l[i]) queue.push(l[i]);
 // Referenz-Folgen (von Eltern geprüft) zuerst, damit Verbesserungen schnell messbar sind
 const reference = JSON.parse(readFileSync(new URL("../lib/reference-markers.json", import.meta.url), "utf8"));
 const isRef = (e) => reference.some((r) => e.title.includes(r.title));
@@ -183,6 +210,7 @@ for (let qi = 0; qi < queue.length; qi++) {
     index.entries[h] = { ...rest, title: ep.title, at: Date.now() };
     if (segments) writeFileSync(join(OUT, "segments", `${h}.json`), JSON.stringify(segments));
     console.log(`✓ ${ep.show} – ${ep.title}: Werbung bis ${data.contentStart}s, Geschichte ab ${data.storyStart}s (${data.model}) ${data.reason || ""}`);
+    if (data.snake) console.log(`  Schlange – wird ausgeblendet ${(data.snakeWords || []).join(" | ")}`);
     if (data.warnings) console.log(`  Hinweise: ${data.warnings.join(" | ")}`);
   } else {
     index.entries[h] = { error: data.error || String(status), title: ep.title, at: Date.now() };

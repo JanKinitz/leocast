@@ -1,0 +1,5 @@
+{
+  "_info": "Folgen mit Schlangen werden ausgeblendet (Titel, Beschreibung und KI-Analyse des Anfangs). Wird von lib/podcasts.ts, app/api/analyze und scripts/analyse-all.mjs gelesen.",
+  "snake": "schlange|kobra|python|anakonda|anaconda|viper|(?<!sch)natter|kreuzotter|sandotter|schwarze mamba|grüne mamba|blindschleiche|boa constrictor",
+  "snakeIgnore": "warteschlangen?|schlange (zu )?stehen|schlangestehen|schlangenlinie\\w*|in der schlange"
+}
