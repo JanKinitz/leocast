@@ -23,7 +23,7 @@ export type Episode = {
 
 export type Feed = { title: string; image?: string; episodes: Episode[]; loadedAt: number };
 
-const feedKey = (id: string) => `leocast:feed4:${id}`;
+const feedKey = (id: string) => `leocast:feed5:${id}`;
 const feedUrlKey = (id: string) => `leocast:feedurl:${id}`;
 
 export function cachedFeed(id: string): Feed | null {
