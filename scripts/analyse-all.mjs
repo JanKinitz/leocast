@@ -22,6 +22,14 @@ const listRes = await fetch(`${BASE}/api/analyse-list`).then((r) => r.json()).ca
 const podcasts =
   listRes?.podcasts ||
   JSON.parse(readFileSync(new URL("../lib/default-podcasts.json", import.meta.url), "utf8")).filter((p) => p.ai);
+// Filter (z. B. „nur für Kinder“) immer aus der aktuellen Grundeinstellung übernehmen
+const defaultsById = Object.fromEntries(
+  JSON.parse(readFileSync(new URL("../lib/default-podcasts.json", import.meta.url), "utf8")).map((p) => [p.id, p]),
+);
+for (const p of podcasts) {
+  const d = defaultsById[p.id];
+  if (d) Object.assign(p, { onlyKids: d.onlyKids, hideTitle: d.hideTitle });
+}
 console.log(`Podcasts mit KI-Sprungmarken (${listRes?.source || "Grundeinstellung"}): ${podcasts.map((p) => p.name).join(", ")}`);
 
 export const hashUrl = (url) => createHash("sha1").update(url.trim()).digest("hex");
@@ -35,6 +43,15 @@ const filter = JSON.parse(readFileSync(new URL("../lib/content-filter.json", imp
 const SNAKE = new RegExp(filter.snake, "i");
 const SNAKE_IGNORE = new RegExp(filter.snakeIgnore, "gi");
 const mentionsSnake = (t) => SNAKE.test(String(t || "").toLowerCase().replace(SNAKE_IGNORE, " "));
+// Zielgruppe einer Folge aus Titel, Untertitel, Stichworten (und Beschreibung) ablesen.
+// „onlyKids“: nur Folgen, die ausdrücklich für Kinder sind – nicht „für Erwachsene“ und nicht „für Erwachsene & Kinder“.
+const ADULT = /erwachsen/i;
+const KIDS = /\b(kinder\w*|kind|kids)\b/i;
+function isForKids(e) {
+  const head = [e.title, e.subtitle, e.keywords].filter(Boolean).join(" ");
+  if (ADULT.test(head)) return false;
+  return KIDS.test(head) || KIDS.test(e.description || "");
+}
 
 function isRealContent(e) {
   if (e.episodeType === "trailer" || e.episodeType === "bonus") return false;
@@ -143,7 +160,9 @@ for (const p of podcasts) {
     const { ok, data } = await json(`${BASE}/api/feed?url=${encodeURIComponent(url)}`);
     if (!ok) continue;
     const hide = p.hideTitle ? new RegExp(p.hideTitle, "i") : null;
-    const shown = (data.episodes || []).filter((e) => e.audioUrl && isRealContent(e) && !(hide && hide.test(e.title)));
+    const shown = (data.episodes || []).filter(
+      (e) => e.audioUrl && isRealContent(e) && !(hide && hide.test(e.title)) && (!p.onlyKids || isForKids(e)),
+    );
     // Schlange schon im Titel oder in der Beschreibung: blendet die App selbst aus, Analyse nicht nötig
     const eps = shown
       .filter((e) => !mentionsSnake(`${e.title} ${e.description || ""}`))
@@ -151,6 +170,11 @@ for (const p of podcasts) {
       .map((e) => ({ ...e, show: p.name, night: p.category === "gutenacht" }));
     const hiddenByText = shown.length - eps.length;
     lists.push(eps);
+    if (p.onlyKids) {
+      const dropped = (data.episodes || []).filter((e) => isRealContent(e) && !isForKids(e)).slice(0, 15);
+      console.log(`  nur für Kinder – ausgeblendet z. B.: ${dropped.map((e) => e.title).join(" | ")}`);
+      console.log(`  behalten z. B.: ${eps.slice(0, 10).map((e) => e.title).join(" | ")}`);
+    }
     stats.push({ id: p.id, name: p.name, category: p.category, hidden: hiddenByText, hashes: eps.map((e) => hashUrl(e.audioUrl)) });
     console.log(`${p.name}: ${eps.length} Folgen (${data.pages || 1} Feed-Seiten, ${hiddenByText} mit Schlange im Titel)`);
   } catch (e) {

@@ -17,6 +17,8 @@ type Episode = {
   image?: string;
   description?: string;
   episodeType?: string;
+  subtitle?: string;
+  keywords?: string;
   transcriptUrl?: string;
   transcriptType?: string;
   chaptersUrl?: string;
@@ -151,6 +153,8 @@ export async function GET(request: Request) {
         image: item["itunes:image"]?.["@_href"] || channelImage,
         description: text(item["itunes:summary"] || item.description).slice(0, 500),
         episodeType: text(item["itunes:episodeType"]) || undefined,
+        subtitle: text(item["itunes:subtitle"]).slice(0, 300) || undefined,
+        keywords: text(item["itunes:keywords"]).slice(0, 300) || undefined,
         ...pickTranscript(item),
         chaptersUrl: asArray<any>(item["podcast:chapters"])[0]?.["@_url"],
       };

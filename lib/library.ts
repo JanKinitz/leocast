@@ -37,6 +37,8 @@ export type PodcastSource = {
   feedUrl?: string;
   /** Zusätzlich ausblenden, wenn der Titel passt (z. B. Folgen nur für Erwachsene) */
   hideTitle?: RegExp;
+  /** Nur Folgen zeigen, die ausdrücklich für Kinder sind (Titel, Untertitel, Stichworte) */
+  onlyKids?: boolean;
   /** Werbung vor der Folge automatisch überspringen */
   skipAds?: boolean;
   /** Zusätzliche Wörter, die zum Vorspann gehören (für die Transkript-Erkennung) */

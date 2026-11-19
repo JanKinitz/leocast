@@ -75,6 +75,7 @@ export type AnalysePodcast = {
   search?: string;
   category: string;
   hideTitle?: string;
+  onlyKids?: boolean;
 };
 
 type DefaultPodcast = AnalysePodcast & { ai?: boolean };
@@ -89,7 +90,7 @@ export function analyseList(state: SyncState, defaults: DefaultPodcast[]): Analy
   const out: AnalysePodcast[] = [];
   for (const p of defaults) {
     if (hidden.has(p.id)) continue;
-    if (flag(p.id) ?? p.ai) out.push({ id: p.id, name: p.name, feedUrl: p.feedUrl, search: p.search, category: p.category, hideTitle: p.hideTitle });
+    if (flag(p.id) ?? p.ai) out.push({ id: p.id, name: p.name, feedUrl: p.feedUrl, search: p.search, category: p.category, hideTitle: p.hideTitle, onlyKids: p.onlyKids });
   }
   for (const item of Object.values(state.keys["leocast:custom-podcasts"] || {})) {
     const c = item.v as { id: string; name: string; feedUrl: string; category: string } | null;

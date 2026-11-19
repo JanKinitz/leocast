@@ -47,10 +47,10 @@
     "name": "Bleib entspannt!",
     "search": "Bleib entspannt Meditations-Podcast",
     "feedUrl": "https://cdn.audiorella.com/podcasts/1760-bleib-entspannt-der-meditations-podcast-magische-momente-fur-kinder-eltern/feed.rss",
-    "hideTitle": "^(?!.*kinder).*erwachsene",
     "skipAds": true,
     "color": "#2d6177",
     "category": "gutenacht",
-    "ai": true
+    "ai": true,
+    "onlyKids": true
   }
 ]

@@ -23,7 +23,7 @@ export type Episode = {
 
 export type Feed = { title: string; image?: string; episodes: Episode[]; loadedAt: number };
 
-const feedKey = (id: string) => `leocast:feed3:${id}`;
+const feedKey = (id: string) => `leocast:feed4:${id}`;
 const feedUrlKey = (id: string) => `leocast:feedurl:${id}`;
 
 export function cachedFeed(id: string): Feed | null {
@@ -107,7 +107,14 @@ export function loadFeed(source: PodcastSource, maxAgeMs = 30 * 60 * 1000): Prom
         chaptersUrl: e.chaptersUrl,
       }));
       const before = episodes.length;
-      episodes = episodes.filter((e) => isRealContent(e) && !(source.hideTitle && source.hideTitle.test(e.title)));
+      const kidsOnly = new Set(
+        (data.episodes || [])
+          .filter((e: { title: string }) => !source.onlyKids || isForKids(e))
+          .map((e: { guid?: string; audioUrl: string }) => e.guid || e.audioUrl),
+      );
+      episodes = episodes.filter(
+        (e) => isRealContent(e) && !(source.hideTitle && source.hideTitle.test(e.title)) && kidsOnly.has(e.guid || e.audioUrl),
+      );
       if (before !== episodes.length) log("info", `„${source.name}“: ${before - episodes.length} Folgen ohne echten Inhalt ausgeblendet`);
       // Folgen mit Schlangen ausblenden (Titel oder Beschreibung)
       const descr = new Map<string, string>((data.episodes || []).map((e: any) => [e.guid, String(e.description || "")]));
@@ -131,6 +138,17 @@ export function loadFeed(source: PodcastSource, maxAgeMs = 30 * 60 * 1000): Prom
 
 // Ankündigungen, Pausen-Hinweise, Trailer und sehr kurze Folgen sind keine echten Inhalte
 const NOT_CONTENT = /\b(ankündigung|trailer|teaser|vorschau|pause|sommerpause|winterpause|in eigener sache|hinweis|neuigkeiten|news|update|bonus-?info)\b/i;
+
+// Zielgruppe einer Folge aus Titel, Untertitel, Stichworten (und Beschreibung) ablesen.
+// „onlyKids“: nur Folgen, die ausdrücklich für Kinder sind – nicht „für Erwachsene“ und nicht „für Erwachsene & Kinder“.
+const ADULT = /erwachsen/i;
+const KIDS = /\b(kinder\w*|kind|kids)\b/i;
+
+export function isForKids(e: { title: string; subtitle?: string; keywords?: string; description?: string }): boolean {
+  const head = [e.title, e.subtitle, e.keywords].filter(Boolean).join(" ");
+  if (ADULT.test(head)) return false;
+  return KIDS.test(head) || KIDS.test(e.description || "");
+}
 
 export function isRealContent(e: Episode): boolean {
   if (e.episodeType === "trailer" || e.episodeType === "bonus") return false;
