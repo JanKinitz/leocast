@@ -26,6 +26,10 @@ type PlayerCtx = {
   play: (item: MediaItem, more?: MediaItem[]) => Promise<void>;
   toggle: () => void;
   seekBy: (sec: number) => void;
+  /** Ganze Liste, aus der gerade abgespielt wird (Playlist, Album, Sendung) */
+  list: MediaItem[];
+  /** Musik: zum vorigen (-1) bzw. nächsten (+1) Lied der Liste */
+  skipTrack: (dir: -1 | 1) => void;
   seekTo: (sec: number) => void;
   sleep: SleepMode;
   setSleep: (m: SleepMode) => void;
@@ -64,6 +68,7 @@ export default function PlayerProvider({ children }: { children: React.ReactNode
   const [more, setMore] = useState<MediaItem[]>([]);
   // ganze Liste der aktuellen Playlist/Sendung (für „nächstes Lied“-Anzeige)
   const moreRef = useRef<MediaItem[]>([]);
+  const [list, setList] = useState<MediaItem[]>([]);
   const [playing, setPlaying] = useState(false);
   useEffect(() => setAppPlaying(playing), [playing]);
   const [position, setPosition] = useState(0);
@@ -196,6 +201,7 @@ export default function PlayerProvider({ children }: { children: React.ReactNode
       setCurrent(item);
       setMore(moreItems.filter((m) => m.id !== item.id).slice(0, 12));
       moreRef.current = moreItems;
+      setList(moreItems);
       setPosition(0);
       setDuration(item.durationSec || 0);
       open();
@@ -278,6 +284,22 @@ export default function PlayerProvider({ children }: { children: React.ReactNode
       }
     },
     [open],
+  );
+
+  const skipTrack = useCallback(
+    (dir: -1 | 1) => {
+      const all = moreRef.current;
+      const cur = currentRef.current;
+      const idx = cur ? all.findIndex((m) => m.id === cur.id) : -1;
+      // Zurück am Liedanfang: vorheriges Lied; nach den ersten Sekunden: Lied von vorn
+      if (dir === -1 && positionRef.current > 4) {
+        if (engineRef.current === "spotify") spotifyRef.current.sdk()?.seek(0);
+        return;
+      }
+      const target = all[idx + dir];
+      if (target) play(target, all);
+    },
+    [play],
   );
 
   const toggle = useCallback(() => {
@@ -377,12 +399,14 @@ export default function PlayerProvider({ children }: { children: React.ReactNode
       spotifyReady: spotifyHook.ready,
       spotifyError: spotifyHook.error,
       error,
+      list,
+      skipTrack,
       storyAt,
       skipToStory,
       relaxAt,
       skipToRelax,
     }),
-    [current, more, playing, position, duration, expanded, open, close, play, toggle, seekBy, seekTo, sleep, setSleep, sleepEndsAt, spotifyHook.ready, spotifyHook.error, error, storyAt, skipToStory, relaxAt, skipToRelax],
+    [current, more, playing, position, duration, expanded, open, close, play, toggle, seekBy, seekTo, sleep, setSleep, sleepEndsAt, spotifyHook.ready, spotifyHook.error, error, storyAt, skipToStory, relaxAt, skipToRelax, list, skipTrack],
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

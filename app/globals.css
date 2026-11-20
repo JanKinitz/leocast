@@ -1879,3 +1879,7 @@ h3 {
     height: 48px;
   }
 }
+
+.round-btn:disabled {
+  opacity: 0.35;
+}

@@ -8,7 +8,7 @@ import { useState } from "react";
 import { isLiked, toggleLike, useStoreVersion } from "@/lib/store";
 import { usePlayer, type SleepMode } from "./PlayerProvider";
 import { PlayTile } from "./Tiles";
-import { IconBack10, IconDown, IconFwd30, IconHeart, IconMoon, IconPause, IconPlay, IconBook } from "./Icons";
+import { IconBack10, IconDown, IconFwd30, IconHeart, IconMoon, IconPause, IconPlay, IconBook, IconNext, IconPrev } from "./Icons";
 import { img } from "@/lib/img";
 
 function fmt(sec: number) {
@@ -51,6 +51,10 @@ function FullPlayer() {
   const item = p.current;
   const liked = isLiked(item.id);
   const remainingMin = p.sleepEndsAt ? Math.max(1, Math.ceil((p.sleepEndsAt - Date.now()) / 60000)) : null;
+  // Musik: Vor/Zurück springt zum nächsten bzw. vorigen Lied statt 10/30 Sekunden
+  const isMusic = item.kind === "track";
+  const idx = p.list.findIndex((m) => m.id === item.id);
+  const upNext = idx >= 0 ? p.list.slice(idx + 1, idx + 13) : [];
 
   return (
     <div className="full-player" style={{ ["--world" as string]: item.color || "#1f3a5c" }}>
@@ -96,17 +100,29 @@ function FullPlayer() {
           </div>
 
           <div className="fp-controls">
-            <button className="round-btn mid" onClick={() => p.seekBy(-10)} aria-label="10 Sekunden zurück">
-              <IconBack10 />
-              <span className="btn-mini-label">10</span>
-            </button>
+            {isMusic ? (
+              <button className="round-btn mid" onClick={() => p.skipTrack(-1)} aria-label="Voriges Lied" disabled={idx <= 0 && p.position < 4}>
+                <IconPrev />
+              </button>
+            ) : (
+              <button className="round-btn mid" onClick={() => p.seekBy(-10)} aria-label="10 Sekunden zurück">
+                <IconBack10 />
+                <span className="btn-mini-label">10</span>
+              </button>
+            )}
             <button className="round-btn huge" onClick={p.toggle} aria-label={p.playing ? "Pause" : "Abspielen"}>
               {p.playing ? <IconPause size={44} /> : <IconPlay size={44} />}
             </button>
-            <button className="round-btn mid" onClick={() => p.seekBy(30)} aria-label="30 Sekunden vor">
-              <IconFwd30 />
-              <span className="btn-mini-label">30</span>
-            </button>
+            {isMusic ? (
+              <button className="round-btn mid" onClick={() => p.skipTrack(1)} aria-label="Nächstes Lied" disabled={idx >= p.list.length - 1}>
+                <IconNext />
+              </button>
+            ) : (
+              <button className="round-btn mid" onClick={() => p.seekBy(30)} aria-label="30 Sekunden vor">
+                <IconFwd30 />
+                <span className="btn-mini-label">30</span>
+              </button>
+            )}
           </div>
 
           {/* Sprungknöpfe: nur zeigen, was noch vor einem liegt */}
@@ -166,7 +182,17 @@ function FullPlayer() {
         </div>
       </div>
 
-      {p.more.length > 0 && (
+      {isMusic && upNext.length > 0 && (
+        <div className="fp-more">
+          <h3>Als Nächstes</h3>
+          <div className="rail">
+            {upNext.map((m) => (
+              <PlayTile key={m.id} item={m} more={p.list} />
+            ))}
+          </div>
+        </div>
+      )}
+      {!isMusic && p.more.length > 0 && (
         <div className="fp-more">
           <h3>Mehr von {item.subtitle || "hier"}</h3>
           <div className="rail">

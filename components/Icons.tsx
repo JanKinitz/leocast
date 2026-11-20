@@ -109,3 +109,17 @@ export const IconBook = ({ size = 26 }: P) => (
     <path d="M21 5.5c0-.8-.7-1.5-1.5-1.5H14a2 2 0 0 0-2 2v14a2 2 0 0 1 2-2h5.5c.8 0 1.5-.7 1.5-1.5z" />
   </svg>
 );
+
+export const IconPrev = ({ size = 30 }: P) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+    <rect x="4" y="5" width="2.6" height="14" rx="1.2" />
+    <path d="M19 5.8v12.4c0 .8-.9 1.3-1.6.8L8.6 12.8a1 1 0 0 1 0-1.6l8.8-6.2c.7-.5 1.6 0 1.6.8z" />
+  </svg>
+);
+
+export const IconNext = ({ size = 30 }: P) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+    <rect x="17.4" y="5" width="2.6" height="14" rx="1.2" />
+    <path d="M5 5.8v12.4c0 .8.9 1.3 1.6.8l8.8-6.2a1 1 0 0 0 0-1.6L6.6 5c-.7-.5-1.6 0-1.6.8z" />
+  </svg>
+);
