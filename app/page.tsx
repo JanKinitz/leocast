@@ -1,6 +1,6 @@
 "use client";
 
-// Startseite: Meine Podcasts, Meine Lieder, Gute Nacht (Weiterhören und Mag ich stehen unter „Ich“) – alles als wischbare Kachel-Reihen.
+// Startseite: Meine Podcasts, Gute Nacht, Meine Musik (Weiterhören und Mag ich stehen unter „Ich“) – alles als wischbare Kachel-Reihen.
 import InstallBanner from "@/components/InstallBanner";
 import TopNav from "@/components/TopNav";
 import { withFigures } from "@/components/Figures";
@@ -22,7 +22,7 @@ export default function Home() {
   useStoreVersion();
   const online = useOnline();
   const { loggedIn } = useSpotifyPlaylists();
-  // Meine Lieder: nur was die Eltern im Elternbereich ausgewählt haben (Playlists, Alben).
+  // Meine Musik: nur was die Eltern im Elternbereich ausgewählt haben (Playlists, Alben).
   // Nur mit Spotify-Anmeldung auf diesem Gerät und mit Internet – sonst ließe sich nichts abspielen.
   const music = getPicks().map((p) => ({ id: p.id, href: `/${p.kind}/${p.id}`, name: p.name, image: p.image }));
   const library = allPodcasts();
@@ -42,18 +42,18 @@ export default function Home() {
         </Rail>
       )}
 
-      {online && loggedIn && music.length > 0 && (
-        <Rail title="Meine Lieder">
-          {music.map((m) => (
-            <LinkTile key={m.id} href={m.href} title={m.name} image={m.image} color={colorFor(m.name)} />
-          ))}
-        </Rail>
-      )}
 
       {night.length > 0 && (
         <Rail title="Gute Nacht">
           {night.map((s) => (
             <PodcastTile key={s.id} source={s} />
+          ))}
+        </Rail>
+      )}
+      {online && loggedIn && music.length > 0 && (
+        <Rail title="Meine Musik">
+          {music.map((m) => (
+            <LinkTile key={m.id} href={m.href} title={m.name} image={m.image} color={colorFor(m.name)} />
           ))}
         </Rail>
       )}

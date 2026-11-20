@@ -1,6 +1,6 @@
 "use client";
 
-// Elternbereich: Playlists und Alben aus Spotify für „Meine Lieder“ auswählen (keine einzelnen Lieder).
+// Elternbereich: Playlists und Alben aus Spotify für „Meine Musik“ auswählen (keine einzelnen Lieder).
 import { useState } from "react";
 import { searchSpotify, type SpotifyPick } from "@/lib/spotify";
 import { addPick, getPicks, read, removePick, useStoreVersion, write } from "@/lib/store";
@@ -35,7 +35,7 @@ export default function SpotifyPicks({ loggedIn }: { loggedIn: boolean }) {
 
   return (
     <>
-      <h3>Musik für „Meine Lieder“</h3>
+      <h3>Musik für „Meine Musik“</h3>
       <label className="ai-switch">
         <span className="ai-name">Lieder einer Playlist nacheinander abspielen</span>
         <input
@@ -64,7 +64,7 @@ export default function SpotifyPicks({ loggedIn }: { loggedIn: boolean }) {
           ))}
         </ul>
       ) : (
-        <p className="hint">Noch nichts ausgewählt – „Meine Lieder“ ist in der Kinderansicht ausgeblendet.</p>
+        <p className="hint">Noch nichts ausgewählt – „Meine Musik“ ist in der Kinderansicht ausgeblendet.</p>
       )}
 
       {loggedIn && own.length > 0 && (

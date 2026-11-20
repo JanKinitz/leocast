@@ -253,7 +253,7 @@ export default function Eltern() {
         ) : (
           <>
             <p className="warn-box">
-              Auf diesem Gerät noch nicht bei Spotify angemeldet. Ohne Anmeldung ist „Meine Lieder“ hier ausgeblendet.
+              Auf diesem Gerät noch nicht bei Spotify angemeldet. Ohne Anmeldung ist „Meine Musik“ hier ausgeblendet.
             </p>
             <p>Einmal mit dem Spotify-Konto des Kindes anmelden.</p>
             <button onClick={() => startLogin()}>Mit Spotify anmelden</button>
