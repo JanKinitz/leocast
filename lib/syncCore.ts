@@ -10,6 +10,8 @@ export type DeviceInfo = {
   at: number;
   /** offline gespeicherte Folgen auf diesem Gerät */
   downloads: Record<string, { title: string; podcastId?: string; image?: string }>;
+  /** Von Eltern aus der Liste entfernt (ein noch genutztes Gerät meldet sich beim nächsten Abgleich wieder an) */
+  removed?: boolean;
   /** Auf diesem Gerät mit Spotify angemeldet? (nur ja/nein – Zugangsdaten bleiben auf dem Gerät) */
   spotify?: boolean;
 };

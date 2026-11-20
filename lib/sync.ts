@@ -74,21 +74,71 @@ export function getFamilyCode(): string | null {
   return read<string | null>(CODE, null);
 }
 
-type Device = { id: string; name: string; changed: number };
+type Device = { id: string; name: string; changed: number; renamed?: boolean; model?: boolean };
+
+/** Android: Telefone haben „Mobile“ im Browser-Kennzeichen, Tablets nicht */
+function isTablet(): boolean {
+  if (typeof navigator === "undefined") return false;
+  const ua = navigator.userAgent;
+  if (/Android/i.test(ua)) return !/Mobile/i.test(ua);
+  return /iPad/i.test(ua) || Math.min(window.screen.width, window.screen.height) >= 700;
+}
 
 export function getDevice(): Device {
   let d = read<Device | null>(DEVICE, null);
   if (!d) {
-    const tablet = typeof window !== "undefined" && Math.min(window.screen.width, window.screen.height) >= 600;
-    d = { id: crypto.randomUUID(), name: tablet ? "Tablet" : "Handy", changed: Date.now() };
+    d = { id: crypto.randomUUID(), name: isTablet() ? "Tablet" : "Handy", changed: Date.now() };
     writeRaw(DEVICE, d);
   }
   return d;
 }
 
+/** Gerätemodell aus Chrome (z. B. „SM-A426B“ oder „Pixel 7“) als Namen übernehmen, solange niemand umbenannt hat */
+export async function detectDeviceName() {
+  const d = getDevice();
+  if (d.renamed || d.model) return;
+  const uad = (navigator as unknown as { userAgentData?: { getHighEntropyValues: (k: string[]) => Promise<{ model?: string }> } })
+    .userAgentData;
+  try {
+    const { model } = uad ? await uad.getHighEntropyValues(["model"]) : { model: undefined };
+    const kind = isTablet() ? "Tablet" : "Handy";
+    const pretty = model ? prettyModel(model) : "";
+    writeRaw(DEVICE, { ...d, name: pretty ? `${kind} ${pretty}` : kind, model: true, changed: Date.now() });
+  } catch {
+    /* kein Modell verfügbar */
+  }
+}
+
+// Samsung nennt seine Geräte intern „SM-A426B“ – daraus „Galaxy A42“ machen; andere Hersteller liefern meist schon Klartext
+function prettyModel(model: string): string {
+  const m = /^SM-([A-Z])(\d{2,3})/i.exec(model.trim());
+  if (m) {
+    const series = m[1].toUpperCase();
+    const num = m[2].length === 3 ? m[2].slice(0, 2) : m[2];
+    const name = series === "F" ? `Z Fold/Flip` : series === "X" || series === "T" || series === "P" ? `Tab` : `${series}${num}`;
+    return `Galaxy ${name} (${model.trim()})`;
+  }
+  return model.trim();
+}
+
 export function setDeviceName(name: string) {
   const d = getDevice();
-  writeRaw(DEVICE, { ...d, name: name.trim().slice(0, 30) || d.name, changed: Date.now() });
+  writeRaw(DEVICE, { ...d, name: name.trim().slice(0, 30) || d.name, renamed: true, changed: Date.now() });
+}
+
+const REMOVALS = "leocast:device-removals";
+
+/** Gerät aus der Liste nehmen (wird beim nächsten Abgleich an alle Geräte weitergegeben) */
+export function removeDevices(ids: string[]) {
+  const now = Date.now();
+  const map = read<Record<string, number>>(REMOVALS, {});
+  for (const id of ids) if (id !== getDevice().id) map[id] = now;
+  writeRaw(REMOVALS, map);
+  const status = getSyncStatus();
+  if (status?.devices) {
+    for (const id of ids) if (status.devices[id] && id !== getDevice().id) status.devices[id] = { ...status.devices[id], removed: true, at: now };
+    writeRaw(STATUS, status);
+  }
 }
 
 export function getSyncStatus(): SyncStatus | null {
@@ -139,6 +189,9 @@ function buildState(): SyncState {
     writeRaw("leocast:sync-downloads", sig);
   }
   state.devices[device.id] = own;
+  for (const [id, at] of Object.entries(read<Record<string, number>>(REMOVALS, {}))) {
+    state.devices[id] = { name: "", at, downloads: {}, removed: true };
+  }
   return state;
 }
 
@@ -184,6 +237,8 @@ async function post(payload: Record<string, unknown>) {
 
 export function syncNow(reason = ""): Promise<void> {
   if (typeof navigator === "undefined" || !navigator.onLine) return Promise.resolve();
+  // Automatische Testbrowser (z. B. die Foto-Prüfung auf GitHub) nie als Gerät anmelden
+  if (navigator.webdriver) return Promise.resolve();
   if (running) return running;
   running = (async () => {
     try {
@@ -197,7 +252,15 @@ export function syncNow(reason = ""): Promise<void> {
         }
         writeRaw(CODE, null);
       }
-      const data = await post({ auto: true });
+      let data = await post({ auto: true });
+      // Wurde dieses Gerät von einem anderen aus der Liste genommen, aber es wird noch benutzt: wieder anmelden
+      const me = data.state.devices[getDevice().id];
+      if (me?.removed) {
+        writeRaw(DEVICE, { ...getDevice(), changed: Date.now() });
+        writeRaw("leocast:sync-downloads", "");
+        data = await post({ auto: true });
+      }
+      writeRaw(REMOVALS, {});
       const changed = applyState(data.state);
       writeRaw(STATUS, {
         at: Date.now(),

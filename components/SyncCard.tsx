@@ -2,7 +2,7 @@
 
 // Elternbereich: Abgleich zwischen den Geräten (läuft automatisch), Gerätename, was auf welchem Gerät gespeichert ist.
 import { useEffect, useState } from "react";
-import { getDevice, getSyncStatus, setDeviceName, syncConfigured, syncNow } from "@/lib/sync";
+import { getDevice, getSyncStatus, removeDevices, setDeviceName, syncConfigured, syncNow } from "@/lib/sync";
 import { useStoreVersion } from "@/lib/store";
 
 function since(at: number) {
@@ -29,7 +29,10 @@ export default function SyncCard() {
   if (!mounted) return null;
   const device = getDevice();
   const status = getSyncStatus();
-  const devices = Object.entries(status?.devices || {}).sort((a, b) => (a[0] === device.id ? -1 : b[0] === device.id ? 1 : 0));
+  const devices = Object.entries(status?.devices || {})
+    .filter(([id, d]) => id === device.id || (!d.removed && d.name))
+    .sort((a, b) => (a[0] === device.id ? -1 : b[0] === device.id ? 1 : b[1].at - a[1].at));
+  const others = devices.filter(([id]) => id !== device.id).map(([id]) => id);
 
   return (
     <section className="card">
@@ -91,14 +94,44 @@ export default function SyncCard() {
                     </span>
                   </button>
                   {open === id && (
-                    <ul className="device-downloads">
-                      {list.length ? list.map(([eid, e]) => <li key={eid}>{e.title}</li>) : <li>Nichts gespeichert</li>}
-                    </ul>
+                    <>
+                      <ul className="device-downloads">
+                        {list.length ? list.map(([eid, e]) => <li key={eid}>{e.title}</li>) : <li>Nichts gespeichert</li>}
+                      </ul>
+                      {id !== device.id && (
+                        <button
+                          className="secondary"
+                          onClick={async () => {
+                            removeDevices([id]);
+                            await syncNow("Gerät entfernt");
+                          }}
+                        >
+                          Aus der Liste entfernen
+                        </button>
+                      )}
+                    </>
                   )}
                 </li>
               );
             })}
           </ul>
+          {others.length > 1 && (
+            <>
+              <button
+                className="secondary"
+                onClick={async () => {
+                  removeDevices(others);
+                  await syncNow("Liste aufgeräumt");
+                }}
+              >
+                Liste aufräumen
+              </button>
+              <p className="hint">
+                Entfernt alle anderen Einträge. Geräte, die Leocast noch benutzen, erscheinen beim nächsten Öffnen von selbst
+                wieder.
+              </p>
+            </>
+          )}
         </>
       )}
     </section>

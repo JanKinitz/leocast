@@ -4,7 +4,7 @@
 // und kurz nach Änderungen. Der Hörfortschritt ändert sich ständig – der wird höchstens alle 10 Minuten
 // geschickt (und sobald die App in den Hintergrund geht), um das kostenlose Kontingent zu schonen.
 import { useEffect } from "react";
-import { setLocalChangeListener, syncNow } from "@/lib/sync";
+import { detectDeviceName, setLocalChangeListener, syncNow } from "@/lib/sync";
 
 const SOON_MS = 5_000;
 const PROGRESS_MS = 10 * 60_000;
@@ -37,7 +37,7 @@ export default function SyncManager() {
     document.addEventListener("visibilitychange", onVisibility);
     window.addEventListener("online", onOnline);
     const timer = window.setInterval(() => document.visibilityState === "visible" && run("regelmäßig"), PULL_MS);
-    run("Start");
+    detectDeviceName().finally(() => run("Start"));
 
     return () => {
       document.removeEventListener("visibilitychange", onVisibility);

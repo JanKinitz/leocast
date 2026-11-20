@@ -1883,3 +1883,14 @@ h3 {
 .round-btn:disabled {
   opacity: 0.35;
 }
+
+/* Aufklappbare Einträge im Elternbereich: dunkle Fläche, gut lesbar (nicht als gelber Hauptknopf) */
+.parents .ana-head {
+  display: flex;
+  border-radius: 14px;
+  padding: 10px 14px;
+  background: var(--surface-2);
+  color: var(--ink);
+  justify-content: flex-start;
+  text-align: left;
+}
