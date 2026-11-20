@@ -24,9 +24,10 @@ jobs:
           npx next start -H 127.0.0.1 -p 3000 &
           sleep 6
           node scripts/screenshot-figures.mjs
+          node scripts/screenshot-layout.mjs || true
       - name: Fotos in den Zweig „fotos“ legen
         run: |
-          mkdir fotos && mv figuren-*.png fotos/
+          mkdir fotos && mv figuren-*.png layout-*.png fotos/ 2>/dev/null || true
           cd fotos
           printf '{ "git": { "deploymentEnabled": false } }\n' > vercel.json
           git init -q -b fotos
