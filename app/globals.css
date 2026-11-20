@@ -1717,3 +1717,67 @@ h3 {
   gap: 8px;
   padding: 8px 16px;
 }
+
+/* ---------- Kopfzeilen mit Zurück immer sichtbar (jede Bildschirmgröße) ----------
+   Beim Scrollen bleibt die Kopfzeile oben stehen; Kinder müssen nie hochscrollen, um zurückzukommen. */
+.world-head {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: var(--bg);
+}
+
+.world .world-head {
+  background: color-mix(in srgb, var(--world) 55%, var(--bg));
+}
+
+.parents .topbar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  margin: calc(-20px - env(safe-area-inset-top)) -20px 16px;
+  padding: calc(12px + env(safe-area-inset-top)) 20px 12px;
+  background: var(--bg);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.3);
+}
+
+/* Großer Player (Handy): Kopfzeile mit Schließen-Knopf bleibt oben, Cover schrumpft mit der Bildschirmhöhe,
+   damit Titel, Fortschritt und Knöpfe ohne Scrollen sichtbar sind */
+.full-player {
+  padding-top: 0;
+}
+
+.fp-top {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  padding: calc(10px + env(safe-area-inset-top)) 16px 8px;
+  background: color-mix(in srgb, var(--world) 70%, #0d0f1f);
+}
+
+.fp-cover {
+  width: clamp(120px, min(74vw, 34dvh), 300px);
+}
+
+.fp-main {
+  gap: clamp(8px, 1.8dvh, 16px);
+}
+
+.fp-body {
+  gap: clamp(8px, 1.6dvh, 14px);
+}
+
+.fp-title {
+  font-size: clamp(19px, 3dvh, 25px);
+}
+
+@media (max-height: 640px) {
+  .round-btn.huge {
+    width: 80px;
+    height: 80px;
+  }
+  .jump-btn {
+    min-height: 64px;
+    font-size: 18px;
+  }
+}
