@@ -96,7 +96,8 @@ export function getDevice(): Device {
 /** Gerätemodell aus Chrome (z. B. „SM-A426B“ oder „Pixel 7“) als Namen übernehmen, solange niemand umbenannt hat */
 export async function detectDeviceName() {
   const d = getDevice();
-  if (d.renamed || d.model) return;
+  // Nur die automatischen Namen ersetzen – selbst vergebene (z. B. „Handy Jan“) bleiben
+  if (d.renamed || d.model || !["Handy", "Tablet"].includes(d.name)) return;
   const uad = (navigator as unknown as { userAgentData?: { getHighEntropyValues: (k: string[]) => Promise<{ model?: string }> } })
     .userAgentData;
   try {
