@@ -35,6 +35,7 @@ export function useSpotifyPlayer(enabled: boolean, onState: (s: SdkState) => voi
   const [error, setError] = useState<string | null>(null);
   const activatedRef = useRef(false);
   const wantedUriRef = useRef<string | null>(null);
+  const allowedRef = useRef<Set<string>>(new Set());
   const onStateRef = useRef(onState);
   onStateRef.current = onState;
 
@@ -70,7 +71,7 @@ export function useSpotifyPlayer(enabled: boolean, onState: (s: SdkState) => voi
         if (!s) return;
         const uri = s.track_window?.current_track?.uri;
         // Kein Autoplay: läuft etwas anderes als der gewählte Titel, sofort anhalten
-        if (wantedUriRef.current && uri && uri !== wantedUriRef.current && !s.paused) {
+        if (allowedRef.current.size && uri && !allowedRef.current.has(uri) && !s.paused) {
           player.pause();
         }
         onStateRef.current({ paused: s.paused, position: s.position / 1000, duration: s.duration / 1000, uri });
@@ -84,7 +85,7 @@ export function useSpotifyPlayer(enabled: boolean, onState: (s: SdkState) => voi
   }, [enabled]);
 
   const play = useCallback(
-    async (uri: string) => {
+    async (uri: string, queue?: string[]) => {
       const player = playerRef.current;
       if (!player || !deviceId) throw new Error("Spotify ist noch nicht bereit");
       if (!activatedRef.current) {
@@ -96,7 +97,8 @@ export function useSpotifyPlayer(enabled: boolean, onState: (s: SdkState) => voi
         activatedRef.current = true;
       }
       wantedUriRef.current = uri;
-      await playUri(deviceId, uri);
+      allowedRef.current = new Set(queue && queue.length ? queue : [uri]);
+      await playUri(deviceId, uri, queue);
     },
     [deviceId],
   );

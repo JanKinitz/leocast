@@ -3,8 +3,8 @@
 // Spotify-Playlist oder -Album: Lieder als große Kacheln. Ein Tipp spielt genau dieses eine Lied.
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { PlayTile, Rail } from "@/components/Tiles";
-import { IconBack } from "@/components/Icons";
+import { usePlayer } from "@/components/PlayerProvider";
+import { IconBack, IconPause, IconPlay } from "@/components/Icons";
 import { useSpotifyPlaylists } from "@/components/hooks";
 import { colorFor, type MediaItem } from "@/lib/library";
 import { getAlbumTracks, getPlaylistItems, type PlayableItem } from "@/lib/spotify";
@@ -70,12 +70,43 @@ export default function MusicPage({ kind, id }: { kind: "playlist" | "album"; id
       </header>
       {error && <p className="hint">{error}</p>}
       {items.length > 0 && (
-        <Rail title="Lieder">
-          {items.map((it) => (
-            <PlayTile key={it.id} item={it} more={items} />
+        <ol className="track-list">
+          {items.map((it, i) => (
+            <TrackRow key={it.id} item={it} index={i} list={items} />
           ))}
-        </Rail>
+        </ol>
       )}
     </main>
+  );
+}
+
+function fmt(sec?: number) {
+  if (!sec) return "";
+  return `${Math.floor(sec / 60)}:${String(Math.round(sec % 60)).padStart(2, "0")}`;
+}
+
+/** Eine Zeile der Liederliste: Antippen spielt das Lied (und je nach Einstellung die folgenden) */
+function TrackRow({ item, index, list }: { item: MediaItem; index: number; list: MediaItem[] }) {
+  const p = usePlayer();
+  const isCurrent = p.current?.id === item.id;
+  return (
+    <li>
+      <button
+        className={`track-row ${isCurrent ? "is-current" : ""}`}
+        onClick={() => (isCurrent ? p.toggle() : p.play(item, list))}
+        aria-label={`${item.title} ${isCurrent && p.playing ? "anhalten" : "abspielen"}`}
+      >
+        <span className="track-num">{index + 1}</span>
+        {item.image ? <img src={img(item.image, 128)} alt="" className="track-cover" /> : <span className="track-cover" />}
+        <span className="track-text">
+          <span className="track-title">{item.title}</span>
+          {item.subtitle && <span className="track-sub">{item.subtitle}</span>}
+        </span>
+        <span className="track-time">{fmt(item.durationSec)}</span>
+        <span className="track-play" aria-hidden="true">
+          {isCurrent && p.playing ? <IconPause size={22} /> : <IconPlay size={22} />}
+        </span>
+      </button>
+    </li>
   );
 }

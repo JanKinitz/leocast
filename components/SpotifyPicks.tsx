@@ -3,7 +3,7 @@
 // Elternbereich: Playlists und Alben aus Spotify für „Meine Lieder“ auswählen (keine einzelnen Lieder).
 import { useState } from "react";
 import { searchSpotify, type SpotifyPick } from "@/lib/spotify";
-import { addPick, getPicks, removePick, useStoreVersion } from "@/lib/store";
+import { addPick, getPicks, read, removePick, useStoreVersion, write } from "@/lib/store";
 import { img } from "@/lib/img";
 import { useSpotifyPlaylists } from "@/components/hooks";
 
@@ -36,6 +36,20 @@ export default function SpotifyPicks({ loggedIn }: { loggedIn: boolean }) {
   return (
     <>
       <h3>Musik für „Meine Lieder“</h3>
+      <label className="ai-switch">
+        <span className="ai-name">Lieder einer Playlist nacheinander abspielen</span>
+        <input
+          type="checkbox"
+          role="switch"
+          checked={read<boolean>("leocast:music-continuous", true) !== false}
+          onChange={(e) => write("leocast:music-continuous", e.target.checked)}
+        />
+        <span className="switch-track" aria-hidden="true" />
+      </label>
+      <p className="hint">
+        Gilt nur für Musik. Es läuft nur die gewählte Playlist bzw. das Album bis zum Ende – danach ist Schluss. Podcasts
+        spielen weiterhin nur eine Folge.
+      </p>
       {picks.length > 0 ? (
         <ul className="pod-list">
           {picks.map((p) => (

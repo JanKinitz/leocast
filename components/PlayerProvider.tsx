@@ -5,7 +5,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import type { MediaItem } from "@/lib/library";
 import { playableSrc } from "@/lib/offline";
 import { getProgress, saveProgress } from "@/lib/store";
-import { loadToken } from "@/lib/spotify";
+import { loadToken, musicContinuous } from "@/lib/spotify";
 import { log } from "@/lib/diagnostics";
 import { setAppPlaying } from "@/lib/appState";
 import { podcastById } from "@/lib/library";
@@ -62,6 +62,8 @@ export default function PlayerProvider({ children }: { children: React.ReactNode
   const lastSaveRef = useRef(0);
   const [current, setCurrent] = useState<MediaItem | null>(null);
   const [more, setMore] = useState<MediaItem[]>([]);
+  // ganze Liste der aktuellen Playlist/Sendung (für „nächstes Lied“-Anzeige)
+  const moreRef = useRef<MediaItem[]>([]);
   const [playing, setPlaying] = useState(false);
   useEffect(() => setAppPlaying(playing), [playing]);
   const [position, setPosition] = useState(0);
@@ -80,6 +82,15 @@ export default function PlayerProvider({ children }: { children: React.ReactNode
 
   const onSdkState = useCallback((s: SdkState) => {
     if (engineRef.current !== "spotify") return;
+    // Nächstes Lied der Playlist läuft: Anzeige im Player mitziehen
+    const cur = currentRef.current;
+    if (s.uri && cur?.uri && s.uri !== cur.uri) {
+      const next = moreRef.current.find((m) => m.uri === s.uri);
+      if (next) {
+        currentRef.current = next;
+        setCurrent(next);
+      }
+    }
     setPlaying(!s.paused);
     setPosition(s.position);
     setDuration(s.duration);
@@ -184,6 +195,7 @@ export default function PlayerProvider({ children }: { children: React.ReactNode
       currentRef.current = item;
       setCurrent(item);
       setMore(moreItems.filter((m) => m.id !== item.id).slice(0, 12));
+      moreRef.current = moreItems;
       setPosition(0);
       setDuration(item.durationSec || 0);
       open();
@@ -254,7 +266,10 @@ export default function PlayerProvider({ children }: { children: React.ReactNode
           setRelaxAt(null);
           audioRef.current?.pause();
           engineRef.current = "spotify";
-          await spotifyRef.current.play(item.uri);
+          const queue = musicContinuous()
+            ? moreItems.filter((m) => m.kind === "track" && m.uri).map((m) => m.uri as string)
+            : undefined;
+          await spotifyRef.current.play(item.uri, queue && queue.includes(item.uri) ? queue : undefined);
         }
       } catch (e) {
         const msg = (e as Error).message;

@@ -13,8 +13,9 @@ Kindgerechte PWA für unsere 7-jährige Tochter: Kindermusik aus Spotify und Kin
 2. **Kinderansicht:** große Tippflächen (mind. 64 px), Titel nie abschneiden (umbrechen statt `ellipsis`/`line-clamp`),
    keine versteckten Gesten außer dem Eltern-Schloss, maximal zwei Taps vom Start bis zum Abspielen.
 3. **Nur abspielbare Inhalte zeigen:** Spotify-Einträge mit `is_playable === false` oder `restrictions` ausfiltern.
-4. **Kein automatisches Weiterspielen:** ein Tap spielt genau einen Titel (`uris: [uri]`); Playlist-Durchlauf nur, wenn im
-   Elternbereich erlaubt.
+4. **Kein automatisches Weiterspielen bei Podcasts:** ein Tap spielt genau eine Folge. Musik (Spotify-Playlist/-Album)
+   läuft nacheinander bis zum Ende der Liste, abschaltbar im Elternbereich („Lieder nacheinander abspielen“, Standard an);
+   nie über die Liste hinaus (Spotify-Autoplay wird angehalten).
 5. **Zugangsdaten** nur als Vercel-Umgebungsvariablen. Nie ausgeben, nie committen. Das Repository ist **öffentlich**.
    Die Spotify-Client-ID ist nicht geheim (PKCE ohne Secret).
 6. **Spotify-Audio nie selbst speichern** (Developer Terms). Offline nur für Folgen aus offenen RSS-Feeds.

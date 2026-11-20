@@ -10,7 +10,7 @@ import { log } from "./diagnostics";
 
 const MAP_KEYS = ["leocast:likes", "leocast:progress", "leocast:podcast-category", "leocast:spotify-picks"];
 const LIST_KEYS = ["leocast:custom-podcasts"]; // Listen von Objekten mit id
-const SCALAR_KEYS = ["leocast:hidden-podcasts"];
+const SCALAR_KEYS = ["leocast:hidden-podcasts", "leocast:music-continuous"];
 const SCALAR_PREFIXES = ["leocast:intro:", "leocast:autostory:", "leocast:ai:"];
 const CORRECTION_PREFIX = "leocast:markers3:"; // nur von Eltern korrigierte Sprungmarken
 

@@ -239,12 +239,24 @@ export async function getPlaylistItems(id: string): Promise<PlayableItem[]> {
     .filter((x) => x.is_playable !== false && !x.restrictions);
 }
 
-export async function playUri(deviceId: string, uri: string) {
-  // Nur genau diesen einen Titel abspielen: kein automatisches Weiterspielen der Playlist
+export async function playUri(deviceId: string, uri: string, queue?: string[]) {
+  // Ohne Liste: nur genau diesen einen Titel. Mit Liste: ab diesem Titel nacheinander (nur diese Liste, nichts danach)
+  const uris = queue && queue.length > 1 ? queue.slice(0, 100) : [uri];
   await api(`/me/player/play?device_id=${encodeURIComponent(deviceId)}`, {
     method: "PUT",
-    body: JSON.stringify({ uris: [uri] }),
+    body: JSON.stringify(uris.length > 1 ? { uris, offset: { uri } } : { uris }),
   });
+}
+
+// Lieder einer Playlist bzw. eines Albums nacheinander abspielen (Einstellung im Elternbereich, Standard: an)
+const CONTINUOUS = "leocast:music-continuous";
+export function musicContinuous(): boolean {
+  try {
+    const v = localStorage.getItem(CONTINUOUS);
+    return v === null ? true : JSON.parse(v) !== false;
+  } catch {
+    return true;
+  }
 }
 
 export async function getDevices() {
