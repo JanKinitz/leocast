@@ -21,16 +21,10 @@ function hasOffline(source: PodcastSource) {
 export default function Home() {
   useStoreVersion();
   const online = useOnline();
-  const { loggedIn, playlists } = useSpotifyPlaylists();
-  // Meine Lieder: Auswahl der Eltern (Playlists, Alben) und die eigenen Playlists des Kinderkontos.
+  const { loggedIn } = useSpotifyPlaylists();
+  // Meine Lieder: nur was die Eltern im Elternbereich ausgewählt haben (Playlists, Alben).
   // Nur mit Spotify-Anmeldung auf diesem Gerät und mit Internet – sonst ließe sich nichts abspielen.
-  const picks = getPicks();
-  const music = [
-    ...picks.map((p) => ({ id: p.id, href: `/${p.kind}/${p.id}`, name: p.name, image: p.image })),
-    ...playlists
-      .filter((pl) => !picks.some((p) => p.id === pl.id))
-      .map((pl) => ({ id: pl.id, href: `/playlist/${pl.id}`, name: pl.name, image: pl.images?.[0]?.url })),
-  ];
+  const music = getPicks().map((p) => ({ id: p.id, href: `/${p.kind}/${p.id}`, name: p.name, image: p.image }));
   const library = allPodcasts();
   const podcasts = library.filter((p) => p.category === "podcasts" && (online || hasOffline(p)));
   const night = library.filter((p) => p.category === "gutenacht" && (online || hasOffline(p)));

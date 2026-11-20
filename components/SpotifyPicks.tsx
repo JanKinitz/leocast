@@ -5,6 +5,7 @@ import { useState } from "react";
 import { searchSpotify, type SpotifyPick } from "@/lib/spotify";
 import { addPick, getPicks, removePick, useStoreVersion } from "@/lib/store";
 import { img } from "@/lib/img";
+import { useSpotifyPlaylists } from "@/components/hooks";
 
 export default function SpotifyPicks({ loggedIn }: { loggedIn: boolean }) {
   useStoreVersion();
@@ -13,6 +14,8 @@ export default function SpotifyPicks({ loggedIn }: { loggedIn: boolean }) {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const picks = getPicks();
+  const { playlists } = useSpotifyPlaylists();
+  const own = playlists.filter((pl) => !picks.some((p) => p.id === pl.id));
 
   async function search(e: React.FormEvent) {
     e.preventDefault();
@@ -47,7 +50,27 @@ export default function SpotifyPicks({ loggedIn }: { loggedIn: boolean }) {
           ))}
         </ul>
       ) : (
-        <p className="hint">Noch nichts ausgewählt. Die eigenen Playlists des Kinderkontos erscheinen trotzdem.</p>
+        <p className="hint">Noch nichts ausgewählt – „Meine Lieder“ ist in der Kinderansicht ausgeblendet.</p>
+      )}
+
+      {loggedIn && own.length > 0 && (
+        <>
+          <p className="hint">Playlists aus dem Spotify-Konto deines Kindes (erscheinen nur, wenn du sie hinzufügst):</p>
+          <ul className="pod-list">
+            {own.map((pl) => (
+              <li key={pl.id}>
+                <span className="pod-name">{pl.name}</span>
+                <button
+                  onClick={() =>
+                    addPick({ kind: "playlist", id: pl.id, name: pl.name, image: pl.images?.[0]?.url, by: "eigene Playlist" })
+                  }
+                >
+                  + Hinzufügen
+                </button>
+              </li>
+            ))}
+          </ul>
+        </>
       )}
 
       {loggedIn ? (
