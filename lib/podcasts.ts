@@ -23,7 +23,7 @@ export type Episode = {
 
 export type Feed = { title: string; image?: string; episodes: Episode[]; loadedAt: number };
 
-const feedKey = (id: string) => `leocast:feed5:${id}`;
+const feedKey = (id: string) => `leocast:feed6:${id}`;
 const feedUrlKey = (id: string) => `leocast:feedurl:${id}`;
 
 export function cachedFeed(id: string): Feed | null {
@@ -142,11 +142,13 @@ const NOT_CONTENT = /\b(ankündigung|trailer|teaser|vorschau|pause|sommerpause|w
 // Zielgruppe einer Folge aus Titel, Untertitel, Stichworten (und Beschreibung) ablesen.
 // „onlyKids“: nur Folgen, die ausdrücklich für Kinder sind – nicht „für Erwachsene“ und nicht „für Erwachsene & Kinder“.
 const ADULT = /erwachsen/i;
+// Folgen für Mütter/Eltern (z. B. Affirmationen, Mutter-Kind-Meditation) sind keine Kinder-Geschichten
+const PARENTS = /für (mütter|mamas|mamis|eltern|väter|papas)|mutter[- ]kind|eltern[- ]kind|mama[- ]kind/i;
 const KIDS = /\b(kinder\w*|kind|kids)\b/i;
 
 export function isForKids(e: { title: string; subtitle?: string; keywords?: string; description?: string }): boolean {
   const head = [e.title, e.subtitle, e.keywords].filter(Boolean).join(" ");
-  if (ADULT.test(head)) return false;
+  if (ADULT.test(head) || PARENTS.test(e.title)) return false;
   return KIDS.test(head) || KIDS.test(e.description || "");
 }
 

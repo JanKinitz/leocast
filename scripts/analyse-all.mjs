@@ -46,10 +46,12 @@ const mentionsSnake = (t) => SNAKE.test(String(t || "").toLowerCase().replace(SN
 // Zielgruppe einer Folge aus Titel, Untertitel, Stichworten (und Beschreibung) ablesen.
 // „onlyKids“: nur Folgen, die ausdrücklich für Kinder sind – nicht „für Erwachsene“ und nicht „für Erwachsene & Kinder“.
 const ADULT = /erwachsen/i;
+// Folgen für Mütter/Eltern (z. B. Affirmationen, Mutter-Kind-Meditation) sind keine Kinder-Geschichten
+const PARENTS = /für (mütter|mamas|mamis|eltern|väter|papas)|mutter[- ]kind|eltern[- ]kind|mama[- ]kind/i;
 const KIDS = /\b(kinder\w*|kind|kids)\b/i;
 function isForKids(e) {
   const head = [e.title, e.subtitle, e.keywords].filter(Boolean).join(" ");
-  if (ADULT.test(head)) return false;
+  if (ADULT.test(head) || PARENTS.test(e.title)) return false;
   return KIDS.test(head) || KIDS.test(e.description || "");
 }
 
