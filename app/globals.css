@@ -262,7 +262,8 @@ h3 {
 }
 
 .tile-wide .cover {
-  aspect-ratio: 16 / 10;
+  /* Folgen-Cover sind quadratisch: nicht beschneiden, damit Schrift im Bild lesbar bleibt */
+  aspect-ratio: 1;
 }
 
 .cover img {
@@ -1168,7 +1169,7 @@ h3 {
 
 /* Kacheln so groß, dass Kopf + eine Reihe + Mini-Player in die Höhe passen */
 .world-fit .tile-wide {
-  width: min(var(--tile-wide), 74vw, calc((100dvh - 420px) * 1.6));
+  width: min(var(--tile-wide), 64vw, calc(100dvh - 470px));
   min-width: 200px;
 }
 
