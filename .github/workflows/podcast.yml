@@ -1,0 +1,45 @@
+# Vertont das Podcast-Skript in podcast/ zu einer MP3 und legt sie auf diesem Zweig ab.
+# Hat nichts mit der App zu tun; läuft nur auf dem Zweig „podcast-audio“.
+name: Podcast vertonen
+
+on:
+  push:
+    branches: [podcast-audio]
+    paths: ["podcast/skript.json", "podcast/vertonen.py", ".github/workflows/podcast.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  vertonen:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Werkzeuge installieren
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
+          pip install -q "piper-tts==1.3.0"
+      - name: Stimmen laden
+        run: |
+          mkdir -p stimmen
+          base=https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/de/de_DE
+          for v in kerstin/low/de_DE-kerstin-low thorsten/high/de_DE-thorsten-high; do
+            n=$(basename "$v")
+            curl -fsSL -o "stimmen/$n.onnx" "$base/$v.onnx"
+            curl -fsSL -o "stimmen/$n.onnx.json" "$base/$v.onnx.json"
+          done
+          ls -la stimmen
+      - name: Vertonen
+        run: python podcast/vertonen.py stimmen podcast/fuenf-jahre-ein-plan.mp3
+      - name: MP3 ablegen
+        run: |
+          git config user.name "leocast-bot"
+          git config user.email "leocast-bot@users.noreply.github.com"
+          git add podcast/fuenf-jahre-ein-plan.mp3
+          git commit -m "Lege vertonte Podcast-Folge ab"
+          git push

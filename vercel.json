@@ -2,7 +2,8 @@
   "git": {
     "deploymentEnabled": {
       "markers": false,
-      "fotos": false
+      "fotos": false,
+      "podcast-audio": false
     }
   }
 }
