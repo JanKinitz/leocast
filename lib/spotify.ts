@@ -19,6 +19,10 @@ export const SPOTIFY_SCOPES = [
 const TOKEN_KEY = "leocast:spotify-token";
 const VERIFIER_KEY = "leocast:pkce-verifier";
 
+const FAMILY_KEY = "leocast:spotify-family-key";
+const AUTH_AT = "leocast:spotify-auth-at";
+const EXPIRED = "leocast:spotify-expired";
+
 export type StoredToken = {
   access_token: string;
   refresh_token?: string;
@@ -92,8 +96,112 @@ export async function finishLogin(code: string): Promise<void> {
     code_verifier: verifier,
   });
   saveToken(token);
+  localStorage.setItem(AUTH_AT, String(Date.now()));
+  localStorage.removeItem(EXPIRED);
   sessionStorage.removeItem(VERIFIER_KEY);
   localStorage.removeItem(VERIFIER_KEY);
+  await shareLogin().catch(() => {}); // klappt das nicht, bleibt die Anmeldung eben nur auf diesem Gerät
+}
+
+// ---- Gemeinsame Anmeldung für alle Geräte (Server hält den Refresh-Token) ----
+
+export function familyKey(): string | null {
+  try {
+    return localStorage.getItem(FAMILY_KEY);
+  } catch {
+    return null;
+  }
+}
+
+export function setFamilyKey(key: string) {
+  localStorage.setItem(FAMILY_KEY, key);
+  localStorage.removeItem(EXPIRED);
+  localStorage.removeItem(TOKEN_KEY); // Zugang kommt ab jetzt vom Server
+}
+
+/** Ist auf diesem Gerät Spotify nutzbar (eigene Anmeldung oder gekoppelt)? */
+export function hasSpotify(): boolean {
+  try {
+    if (localStorage.getItem(EXPIRED)) return false;
+  } catch {
+    return false;
+  }
+  return Boolean(loadToken() || familyKey());
+}
+
+/** Link zum Koppeln eines weiteren Geräts (für den QR-Code). Schlüssel steht hinter #, geht also nie an den Server-Log */
+export function pairingLink(): string | null {
+  const key = familyKey();
+  return key ? `${window.location.origin}/koppeln#k=${key}` : null;
+}
+
+async function familyCall(action: string, extra: Record<string, unknown> = {}) {
+  const res = await fetch("/api/spotify", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action, key: familyKey(), ...extra }),
+    cache: "no-store",
+  });
+  const data = await res.json().catch(() => ({}));
+  return { status: res.status, data };
+}
+
+/** Lokale Anmeldung an den Server übergeben; danach erneuert nur noch der Server */
+export async function shareLogin(): Promise<boolean> {
+  const t = loadToken();
+  if (!t?.refresh_token) return false;
+  const authAt = Number(localStorage.getItem(AUTH_AT)) || undefined;
+  const { status, data } = await familyCall("save", { token: { ...t, auth_at: authAt } });
+  if (status !== 200 || !data.key) return false;
+  localStorage.setItem(FAMILY_KEY, data.key);
+  saveToken({ access_token: t.access_token, expires_at: t.expires_at, scope: t.scope }); // Refresh-Token nur noch beim Server
+  return true;
+}
+
+export type FamilyStatus = {
+  active: boolean;
+  user: string | null;
+  authAt?: number;
+  expiresAround?: number;
+  devices?: number;
+  error?: string;
+};
+
+export async function familyStatus(): Promise<FamilyStatus | null> {
+  if (!familyKey()) return null;
+  try {
+    const { data } = await familyCall("status");
+    return data as FamilyStatus;
+  } catch {
+    return null;
+  }
+}
+
+/** Auf allen Geräten abmelden */
+export async function logoutEverywhere() {
+  await familyCall("logout").catch(() => {});
+  logout();
+}
+
+async function tokenFromFamily(): Promise<string | null> {
+  const { status, data } = await familyCall("token");
+  if (status === 200 && data.access_token) {
+    saveToken({ access_token: data.access_token, expires_at: data.expires_at });
+    return data.access_token as string;
+  }
+  if (status === 410 || status === 404 || status === 403) {
+    // abgelaufen oder abgemeldet: Kinderansicht blendet Musik aus, Eltern melden neu an
+    localStorage.removeItem(TOKEN_KEY);
+    localStorage.setItem(EXPIRED, String(status));
+    return null;
+  }
+  throw new Error(data.error || `Spotify-Zugang: ${status}`);
+}
+
+/** Nur ein Tab/Fenster gleichzeitig erneuert (sonst macht Spotify den Refresh-Token ungültig) */
+function withLock<T>(fn: () => Promise<T>): Promise<T> {
+  const locks = typeof navigator !== "undefined" ? (navigator as Navigator & { locks?: LockManager }).locks : undefined;
+  return locks ? (locks.request("leocast-spotify-token", fn) as Promise<T>) : fn();
 }
 
 function saveToken(token: StoredToken) {
@@ -111,29 +219,51 @@ export function loadToken(): StoredToken | null {
 
 export function logout() {
   localStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem(FAMILY_KEY);
+  localStorage.removeItem(EXPIRED);
 }
 
-let refreshing: Promise<string> | null = null;
+let refreshing: Promise<string | null> | null = null;
 
 export async function getAccessToken(): Promise<string | null> {
   const token = loadToken();
-  if (!token) return null;
-  if (Date.now() < token.expires_at) return token.access_token;
-  if (!token.refresh_token) return null;
+  if (token && Date.now() < token.expires_at) return token.access_token;
+  if (!token && !familyKey()) return null;
   if (!refreshing) {
-    refreshing = tokenRequest({
-      client_id: SPOTIFY_CLIENT_ID,
-      grant_type: "refresh_token",
-      refresh_token: token.refresh_token,
-    })
-      .then((t) => {
-        if (!t.refresh_token) t.refresh_token = token.refresh_token;
+    refreshing = withLock(async () => {
+      // Ein anderer Tab hat vielleicht gerade erneuert
+      const now = loadToken();
+      if (now && Date.now() < now.expires_at) return now.access_token;
+      if (familyKey()) {
+        try {
+          return await tokenFromFamily();
+        } catch (e) {
+          if (!now?.refresh_token) throw e; // sonst unten mit der eigenen Anmeldung weiter
+        }
+      }
+      if (!now?.refresh_token) return null;
+      try {
+        const t = await tokenRequest({
+          client_id: SPOTIFY_CLIENT_ID,
+          grant_type: "refresh_token",
+          refresh_token: now.refresh_token,
+        });
+        if (!t.refresh_token) t.refresh_token = now.refresh_token;
         saveToken(t);
+        // Geräte mit alter Einzel-Anmeldung einmalig an den Server übergeben
+        if (!familyKey()) shareLogin().catch(() => {});
         return t.access_token;
-      })
-      .finally(() => {
-        refreshing = null;
-      });
+      } catch (e) {
+        if (/invalid_grant/.test((e as Error).message)) {
+          localStorage.removeItem(TOKEN_KEY);
+          localStorage.setItem(EXPIRED, "1");
+          return null;
+        }
+        throw e; // z. B. kein Netz: Anmeldung behalten
+      }
+    }).finally(() => {
+      refreshing = null;
+    });
   }
   return refreshing;
 }

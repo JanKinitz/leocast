@@ -5,7 +5,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import type { MediaItem } from "@/lib/library";
 import { playableSrc } from "@/lib/offline";
 import { getProgress, saveProgress } from "@/lib/store";
-import { loadToken, musicContinuous } from "@/lib/spotify";
+import { hasSpotify, musicContinuous } from "@/lib/spotify";
 import { log } from "@/lib/diagnostics";
 import { setAppPlaying } from "@/lib/appState";
 import { podcastById } from "@/lib/library";
@@ -82,7 +82,7 @@ export default function PlayerProvider({ children }: { children: React.ReactNode
   const [relaxAt, setRelaxAt] = useState<number | null>(null);
 
   useEffect(() => {
-    setSpotifyEnabled(!!loadToken());
+    setSpotifyEnabled(hasSpotify());
   }, []);
 
   const onSdkState = useCallback((s: SdkState) => {

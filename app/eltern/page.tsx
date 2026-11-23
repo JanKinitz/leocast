@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import LogPanel from "@/components/LogPanel";
 import { usePlayer } from "@/components/PlayerProvider";
-import { getMe, loadToken, logout, startLogin } from "@/lib/spotify";
+import { getMe, hasSpotify, logout, startLogin } from "@/lib/spotify";
 import { storageEstimate } from "@/lib/offline";
 import { getDownloads, useStoreVersion } from "@/lib/store";
 import { allPodcasts, isAiEnabled, setAiEnabled } from "@/lib/library";
@@ -13,6 +13,7 @@ import PodcastManager from "@/components/PodcastManager";
 import AnalysisPanel from "@/components/AnalysisPanel";
 import SyncCard from "@/components/SyncCard";
 import SpotifyPicks from "@/components/SpotifyPicks";
+import SpotifyFamilyCard from "@/components/SpotifyFamilyCard";
 import { canInstall, isStandalone, onInstallChange, promptInstall } from "@/lib/install";
 
 function InstallCard() {
@@ -212,7 +213,7 @@ export default function Eltern() {
 
   useEffect(() => {
     if (!open) return;
-    const has = !!loadToken();
+    const has = hasSpotify();
     setSpotifyLoggedIn(has);
     if (has)
       getMe()
@@ -247,7 +248,7 @@ export default function Eltern() {
                 setSpotifyLoggedIn(false);
               }}
             >
-              Abmelden
+              Nur hier abmelden
             </button>
           </>
         ) : (
@@ -255,10 +256,11 @@ export default function Eltern() {
             <p className="warn-box">
               Auf diesem Gerät noch nicht bei Spotify angemeldet. Ohne Anmeldung ist „Meine Musik“ hier ausgeblendet.
             </p>
-            <p>Einmal mit dem Spotify-Konto des Kindes anmelden.</p>
+            <p>Einmal mit dem Spotify-Konto des Kindes anmelden – oder auf einem angemeldeten Gerät im Elternbereich den QR-Code zeigen lassen und hier abfotografieren.</p>
             <button onClick={() => startLogin()}>Mit Spotify anmelden</button>
           </>
         )}
+        <SpotifyFamilyCard loggedIn={spotifyLoggedIn} onChange={() => setSpotifyLoggedIn(hasSpotify())} />
         <SpotifyPicks loggedIn={spotifyLoggedIn} />
       </section>
 

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import type { PodcastSource } from "@/lib/library";
 import { cachedFeed, loadFeed, type Feed } from "@/lib/podcasts";
-import { getPlaylists, loadToken, type Playlist } from "@/lib/spotify";
+import { getPlaylists, hasSpotify, type Playlist } from "@/lib/spotify";
 import { read, write } from "@/lib/store";
 import { log } from "@/lib/diagnostics";
 
@@ -46,7 +46,7 @@ export function useSpotifyPlaylists(): { loggedIn: boolean; playlists: Playlist[
   const [loggedIn, setLoggedIn] = useState(false);
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   useEffect(() => {
-    const has = !!loadToken();
+    const has = hasSpotify();
     setLoggedIn(has);
     if (!has) return;
     setPlaylists(read<Playlist[]>(PLAYLISTS_KEY, []));
