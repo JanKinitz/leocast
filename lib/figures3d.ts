@@ -821,10 +821,14 @@ const BUILDERS: Record<string, (THREE: Three) => Built> = {
     const waffle = k.cone(0xd99a4e, 0.42, 1.1, 0, -0.55, 0, { roughness: 0.8 });
     waffle.rotation.x = Math.PI;
     g.add(waffle);
-    for (let i = 0; i < 5; i++) {
-      const line = k.cyl(0xb7791f, 0.012, 0.012, 1.0, Math.sin(i - 2) * 0.12, -0.55, 0.2);
-      line.rotation.z = (i - 2) * 0.18;
-      g.add(line);
+    // Waffelmuster: Ringe um die Waffel
+    for (let i = 1; i < 4; i++) {
+      const y = -0.55 + 0.55 - i * 0.25;
+      const r = 0.42 * ((y + 1.1) / 1.1) + 0.01;
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(r, 0.015, 6, 28), k.mat(0xb7791f));
+      ring.rotation.x = Math.PI / 2;
+      ring.position.y = y;
+      g.add(ring);
     }
     g.add(k.ball(0x86efac, 0.42, 0, 0.05, 0, 1, 0.85, 1));
     const top = new THREE.Group();
