@@ -4,6 +4,7 @@
 import { useEffect, useState } from "react";
 import { getDevice, getSyncStatus, removeDevices, setDeviceName, syncConfigured, syncNow } from "@/lib/sync";
 import { useStoreVersion } from "@/lib/store";
+import { isActiveDevice } from "@/lib/syncCore";
 
 function since(at: number) {
   const min = Math.round((Date.now() - at) / 60000);
@@ -30,7 +31,7 @@ export default function SyncCard() {
   const device = getDevice();
   const status = getSyncStatus();
   const devices = Object.entries(status?.devices || {})
-    .filter(([id, d]) => id === device.id || (!d.removed && d.name))
+    .filter(([id, d]) => id === device.id || isActiveDevice(d))
     .sort((a, b) => (a[0] === device.id ? -1 : b[0] === device.id ? 1 : b[1].at - a[1].at));
   const others = devices.filter(([id]) => id !== device.id).map(([id]) => id);
 

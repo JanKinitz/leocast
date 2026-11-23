@@ -265,6 +265,17 @@ export default function Eltern() {
       </section>
 
       <section className="card">
+        <h2>Figuren</h2>
+        <p>
+          In der Kinderansicht tauchen jede Woche zwei Figuren auf – passend zur Jahreszeit. Hier sind alle 18 zum
+          Anschauen und Antippen.
+        </p>
+        <Link className="button secondary" href="/figuren">
+          Alle Figuren ansehen
+        </Link>
+      </section>
+
+      <section className="card">
         <h2>Ohne Internet</h2>
         <p>
           {downloads} Folgen gespeichert{storage ? ` · ${storage}` : ""}.

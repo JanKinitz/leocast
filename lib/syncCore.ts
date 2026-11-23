@@ -12,6 +12,8 @@ export type DeviceInfo = {
   downloads: Record<string, { title: string; podcastId?: string; image?: string }>;
   /** Von Eltern aus der Liste entfernt (ein noch genutztes Gerät meldet sich beim nächsten Abgleich wieder an) */
   removed?: boolean;
+  /** zuletzt beim Abgleich gemeldet (höchstens einmal am Tag aktualisiert, spart Schreibvorgänge) */
+  seen?: number;
   /** Auf diesem Gerät mit Spotify angemeldet? (nur ja/nein – Zugangsdaten bleiben auf dem Gerät) */
   spotify?: boolean;
 };
@@ -39,9 +41,29 @@ export function mergeStates(a: SyncState, b: SyncState): SyncState {
     out.keys[key] = merged;
   }
   for (const [id, d] of Object.entries(b.devices || {})) {
-    if (!out.devices[id] || d.at > out.devices[id].at) out.devices[id] = d;
+    const old = out.devices[id];
+    const seen = Math.max(old?.seen || 0, d.seen || 0) || undefined;
+    const next = !old || d.at > old.at ? d : old;
+    out.devices[id] = seen ? { ...next, seen } : next;
   }
   return out;
+}
+
+const DAY = 24 * 3600 * 1000;
+
+/** Geräte, die sich lange nicht gemeldet haben, aus der gemeinsamen Liste werfen */
+export function pruneDevices(state: SyncState, now = Date.now()): SyncState {
+  const devices: Record<string, DeviceInfo> = {};
+  for (const [id, d] of Object.entries(state.devices)) {
+    const last = Math.max(d.seen || 0, d.at || 0);
+    if (d.removed ? last > now - 90 * DAY : last > now - 45 * DAY) devices[id] = d;
+  }
+  return { ...state, devices };
+}
+
+/** In der Liste zeigen? Nur Geräte, die sich in den letzten 30 Tagen gemeldet haben */
+export function isActiveDevice(d: DeviceInfo, now = Date.now()): boolean {
+  return !d.removed && Boolean(d.name) && Boolean(d.seen) && (d.seen as number) > now - 30 * DAY;
 }
 
 /** Gleicher Inhalt? (um unnötige Schreibvorgänge zu sparen) */

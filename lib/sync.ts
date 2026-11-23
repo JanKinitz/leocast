@@ -74,20 +74,29 @@ export function getFamilyCode(): string | null {
   return read<string | null>(CODE, null);
 }
 
-type Device = { id: string; name: string; changed: number; renamed?: boolean; model?: boolean };
+type Device = { id: string; name: string; changed: number; seen?: number; renamed?: boolean; model?: boolean };
 
 /** Android: Telefone haben „Mobile“ im Browser-Kennzeichen, Tablets nicht */
 function isTablet(): boolean {
   if (typeof navigator === "undefined") return false;
   const ua = navigator.userAgent;
   if (/Android/i.test(ua)) return !/Mobile/i.test(ua);
-  return /iPad/i.test(ua) || Math.min(window.screen.width, window.screen.height) >= 700;
+  return /iPad/i.test(ua) || (/Macintosh/i.test(ua) && navigator.maxTouchPoints > 1);
+}
+
+function isComputer(): boolean {
+  if (typeof navigator === "undefined") return false;
+  return !/Android|iPhone|iPad|Mobile/i.test(navigator.userAgent) && !isTablet();
 }
 
 export function getDevice(): Device {
   let d = read<Device | null>(DEVICE, null);
   if (!d) {
-    d = { id: crypto.randomUUID(), name: isTablet() ? "Tablet" : "Handy", changed: Date.now() };
+    d = { id: crypto.randomUUID(), name: isComputer() ? "Computer" : isTablet() ? "Tablet" : "Handy", changed: Date.now() };
+    writeRaw(DEVICE, d);
+  }
+  if (!d.renamed && d.name === "Tablet" && isComputer()) {
+    d = { ...d, name: "Computer", changed: Date.now() };
     writeRaw(DEVICE, d);
   }
   return d;
@@ -179,14 +188,20 @@ function buildState(): SyncState {
       { title: d.item.title, podcastId: d.item.podcastId, image: d.item.image },
     ]),
   );
-  const spotify = Boolean(read<unknown>("leocast:spotify-token", null));
-  const own: DeviceInfo = { name: device.name, at: device.changed, downloads, spotify };
+  const spotify = Boolean(read<unknown>("leocast:spotify-token", null) || localStorage.getItem("leocast:spotify-family-key"));
+  // „zuletzt gesehen“ höchstens einmal am Tag weitergeben
+  let seen = device.seen || 0;
+  if (Date.now() - seen > 20 * 3600 * 1000) {
+    seen = Date.now();
+    writeRaw(DEVICE, { ...getDevice(), seen });
+  }
+  const own: DeviceInfo = { name: device.name, at: device.changed, downloads, spotify, seen };
   // Downloads geändert? Dann zählt das als Änderung am Gerät
   const last = read<string>("leocast:sync-downloads", "");
   const sig = JSON.stringify(Object.keys(downloads).sort()) + device.name + spotify;
   if (sig !== last) {
     own.at = Date.now();
-    writeRaw(DEVICE, { ...device, changed: own.at });
+    writeRaw(DEVICE, { ...getDevice(), changed: own.at });
     writeRaw("leocast:sync-downloads", sig);
   }
   state.devices[device.id] = own;

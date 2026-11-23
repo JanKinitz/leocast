@@ -4,7 +4,7 @@
 import { createHash } from "node:crypto";
 import { blobConfigured, blobToken } from "@/lib/blobToken";
 import { head, put } from "@vercel/blob";
-import { analyseList, emptyState, mergeStates, normalizeCode, sameState, type SyncState } from "@/lib/syncCore";
+import { analyseList, emptyState, mergeStates, pruneDevices, normalizeCode, sameState, type SyncState } from "@/lib/syncCore";
 import defaults from "@/lib/default-podcasts.json";
 
 export const runtime = "nodejs";
@@ -96,7 +96,7 @@ export async function POST(request: Request) {
 
   const path = code ? pathFor(code) : FAMILY_PATH;
   const stored = await load(path);
-  const merged = mergeStates(stored, incoming);
+  const merged = pruneDevices(mergeStates(stored, incoming));
   let wrote = false;
   if (!sameState(stored, merged)) {
     await put(path, JSON.stringify(merged), {

@@ -17,19 +17,29 @@ export default function FigurenPage() {
   return (
     <main className="page">
       <header className="world-head">
-        <Link href="/" className="round-btn back-btn" aria-label="Zurück">
+        <Link href="/" onClick={(e) => { if (history.length > 1) { e.preventDefault(); history.back(); } }} className="round-btn back-btn" aria-label="Zurück">
           <IconBack />
         </Link>
         <h1 className="world-title">Alle Figuren</h1>
       </header>
+      <div className="pill-bar" style={{ display: "flex", gap: 8, padding: "0 16px 8px" }}>
+        {[1, 2].map((n) => (
+          <Link
+            key={n}
+            href={n === 2 ? "/figuren?teil=2" : "/figuren"}
+            className={`button ${teil === n ? "" : "secondary"}`}
+            onClick={() => setTeil(n)}
+          >
+            {n === 1 ? "Figuren 1–9" : "Figuren 10–18"}
+          </Link>
+        ))}
+      </div>
       <div className="figure-grid">
         {list.map((f) => (
           <FigureTile key={f.id} figure={f} />
         ))}
       </div>
-      <p className="hint" style={{ padding: "0 16px" }}>
-        <Link href={teil === 2 ? "/figuren" : "/figuren?teil=2"}>{teil === 2 ? "Erste Hälfte" : "Weitere Figuren"}</Link>
-      </p>
+      <p className="hint" style={{ padding: "0 16px" }}>Zum Ausprobieren einfach antippen.</p>
     </main>
   );
 }
