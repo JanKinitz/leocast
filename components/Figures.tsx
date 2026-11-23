@@ -47,7 +47,7 @@ export const FIGURES: Figure[] = [
     name: "Gespensti",
     season: [1015, 1102],
     anim: "float",
-    sound: "huuu",
+    sound: "ghost",
     art: (
       <>
         <path d="M30 100 V55 a30 30 0 0 1 60 0 V100 l-10 -8 -10 8 -10 -8 -10 8 -10 -8z" fill="#f1f3ff" />
@@ -62,7 +62,7 @@ export const FIGURES: Figure[] = [
     name: "Kürbi",
     season: [1001, 1102],
     anim: "bounce",
-    sound: "pop",
+    sound: "pumpkin",
     art: (
       <>
         <rect x="55" y="18" width="10" height="16" rx="4" fill="#4d7c0f" />
@@ -78,7 +78,7 @@ export const FIGURES: Figure[] = [
     name: "Nikolaus",
     season: [1201, 1207],
     anim: "wave",
-    sound: "bells",
+    sound: "santa",
     art: (
       <>
         <path d="M30 50 Q60 0 90 50z" fill="#dc2626" />
@@ -96,7 +96,7 @@ export const FIGURES: Figure[] = [
     name: "Funkelstern",
     season: [1208, 1226],
     anim: "twinkle",
-    sound: "bells",
+    sound: "sparkle",
     art: (
       <>
         <path d="M60 10 L72 44 L108 44 L79 65 L90 100 L60 79 L30 100 L41 65 L12 44 L48 44z" fill="#ffd43b" stroke="#f59f00" strokeWidth="3" strokeLinejoin="round" />
@@ -110,7 +110,7 @@ export const FIGURES: Figure[] = [
     name: "Raketi",
     season: [1227, 102],
     anim: "launch",
-    sound: "whistlePop",
+    sound: "rocket",
     art: (
       <>
         <path d="M60 8 Q84 30 80 78 H40 Q36 30 60 8z" fill="#e5e7eb" />
@@ -127,7 +127,7 @@ export const FIGURES: Figure[] = [
     name: "Flocke",
     season: [1201, 228],
     anim: "wobble",
-    sound: "chime",
+    sound: "snowman",
     art: (
       <>
         <circle cx="60" cy="84" r="28" fill="#f8fafc" />
@@ -147,7 +147,7 @@ export const FIGURES: Figure[] = [
     name: "Tröti",
     season: [201, 305],
     anim: "spin",
-    sound: "honk",
+    sound: "clown",
     art: (
       <>
         <circle cx="34" cy="50" r="14" fill="#f97316" />
@@ -166,7 +166,7 @@ export const FIGURES: Figure[] = [
     name: "Hoppel",
     season: [315, 425],
     anim: "hop",
-    sound: "boing",
+    sound: "bunny",
     art: (
       <>
         <ellipse cx="44" cy="26" rx="9" ry="24" fill="#f5f5f4" />
@@ -186,7 +186,7 @@ export const FIGURES: Figure[] = [
     name: "Summsi",
     season: [401, 615],
     anim: "buzz",
-    sound: "buzz",
+    sound: "bee",
     art: (
       <>
         <ellipse cx="44" cy="38" rx="16" ry="12" fill="#e0f2fe" opacity="0.9" />
@@ -204,7 +204,7 @@ export const FIGURES: Figure[] = [
     name: "Sunny",
     season: [616, 831],
     anim: "spin",
-    sound: "chime",
+    sound: "sun",
     art: (
       <>
         <g stroke="#f59f00" strokeWidth="7" strokeLinecap="round">
@@ -224,7 +224,7 @@ export const FIGURES: Figure[] = [
     name: "Schlecki",
     season: [620, 831],
     anim: "wobble",
-    sound: "pop",
+    sound: "icecream",
     art: (
       <>
         <path d="M38 62 L60 116 L82 62z" fill="#d97706" />
@@ -241,7 +241,7 @@ export const FIGURES: Figure[] = [
     name: "Pieks",
     season: [901, 1130],
     anim: "roll",
-    sound: "sniff",
+    sound: "hedgehog",
     art: (
       <>
         <path d="M18 80 L24 50 L34 64 L40 34 L50 56 L58 28 L64 54 L74 32 L78 58 L90 44 L88 70 L100 66 L92 86z" fill="#78350f" />
@@ -259,7 +259,7 @@ export const FIGURES: Figure[] = [
     id: "wuschel",
     name: "Wuschel",
     anim: "bounce",
-    sound: "giggle",
+    sound: "monster",
     art: (
       <>
         <path d="M24 70 Q18 40 34 36 Q32 18 50 22 Q60 8 72 22 Q90 18 88 36 Q104 42 96 70 Q104 96 80 100 H40 Q16 96 24 70z" fill="#14b8a6" />
@@ -273,7 +273,7 @@ export const FIGURES: Figure[] = [
     id: "frosch",
     name: "Quaki",
     anim: "hop",
-    sound: "ribbit",
+    sound: "frog",
     art: (
       <>
         <circle cx="40" cy="38" r="14" fill="#4ade80" />
@@ -289,7 +289,7 @@ export const FIGURES: Figure[] = [
     id: "eule",
     name: "Uhu",
     anim: "wobble",
-    sound: "hoot",
+    sound: "owl",
     art: (
       <>
         <path d="M30 40 L36 18 L48 32z M90 40 L84 18 L72 32z" fill="#92400e" />
@@ -307,7 +307,7 @@ export const FIGURES: Figure[] = [
     id: "roboter",
     name: "Bip",
     anim: "wave",
-    sound: "beep",
+    sound: "robot",
     art: (
       <>
         <line x1="60" y1="8" x2="60" y2="22" stroke="#94a3b8" strokeWidth="4" />
@@ -325,7 +325,7 @@ export const FIGURES: Figure[] = [
     id: "dino",
     name: "Rexi",
     anim: "bounce",
-    sound: "roar",
+    sound: "dino",
     art: (
       <>
         <path d="M22 96 Q20 60 46 54 Q46 24 72 22 Q100 22 100 46 Q100 60 84 62 L76 62 Q80 96 64 100z" fill="#34d399" />
@@ -340,7 +340,7 @@ export const FIGURES: Figure[] = [
     id: "krake",
     name: "Blubb",
     anim: "wobble",
-    sound: "splash",
+    sound: "octopus",
     art: (
       <>
         <g fill="#c084fc">
