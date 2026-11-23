@@ -381,7 +381,13 @@ export function figuresOfTheWeek(date = new Date()): Figure[] {
   );
   const yearRound = FIGURES.filter((f) => !f.season);
   const pick = (n: number) => yearRound[((week + n) % yearRound.length + yearRound.length) % yearRound.length];
-  if (seasonal.length) return [seasonal[0], seasonal[1] && week % 2 ? seasonal[1] : pick(0)];
+  // Kurze Anlässe (Nikolaus, Halloween, Silvester …) zeigen sich jede Woche, Jahreszeiten-Figuren (z. B. Igel im
+  // Herbst) nur jede zweite – so gibt es jede Woche etwas Neues zu entdecken
+  const special = seasonal.filter((f) => seasonLength(f.season!) <= 45);
+  const long = seasonal.filter((f) => seasonLength(f.season!) > 45);
+  const longPick = long.length ? long[Math.floor(week / 2) % long.length] : null;
+  if (special.length) return [special[0], week % 2 && longPick ? longPick : pick(0)];
+  if (longPick && week % 2 === 0) return [longPick, pick(0)];
   return [pick(0), pick(3)];
 }
 
