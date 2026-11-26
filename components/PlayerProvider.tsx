@@ -308,9 +308,18 @@ export default function PlayerProvider({ children }: { children: React.ReactNode
       if (a.paused) a.play();
       else a.pause();
     } else if (engineRef.current === "spotify") {
-      spotifyRef.current.sdk()?.togglePlay();
+      const p = spotifyRef.current.sdk();
+      if (!p) return;
+      // Nach einer Neuverbindung ist im Player nichts geladen: dann das aktuelle Lied neu starten
+      Promise.resolve(p.getCurrentState())
+        .catch(() => null)
+        .then((s: unknown) => {
+          const cur = currentRef.current;
+          if (s) p.togglePlay();
+          else if (cur) play(cur, moreRef.current);
+        });
     }
-  }, []);
+  }, [play]);
 
   const seekTo = useCallback(
     (sec: number) => {
