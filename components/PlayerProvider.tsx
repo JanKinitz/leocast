@@ -43,6 +43,8 @@ type PlayerCtx = {
   /** Absolute Stelle, an der die Entspannung beginnt (oder null) */
   relaxAt: number | null;
   skipToRelax: () => void;
+  /** Nach einem Fehler: aktuelle Folge bzw. aktuelles Lied an derselben Stelle neu starten */
+  retry: () => void;
 };
 
 const Ctx = createContext<PlayerCtx | null>(null);
@@ -64,6 +66,12 @@ export default function PlayerProvider({ children }: { children: React.ReactNode
   const engineRef = useRef<"audio" | "spotify" | null>(null);
   const currentRef = useRef<MediaItem | null>(null);
   const lastSaveRef = useRef(0);
+  // Podcast-Folgen: soll gerade etwas laufen? Und Stand der automatischen Wiederholung nach Fehlern
+  const wantPlayRef = useRef(false);
+  const recoveringRef = useRef(false);
+  const retryCountRef = useRef(0);
+  const goodPosRef = useRef(0);
+  const lastRetryPosRef = useRef(0);
   const [current, setCurrent] = useState<MediaItem | null>(null);
   const [more, setMore] = useState<MediaItem[]>([]);
   // ganze Liste der aktuellen Playlist/Sendung (für „nächstes Lied“-Anzeige)
@@ -114,7 +122,10 @@ export default function PlayerProvider({ children }: { children: React.ReactNode
     a.preload = "auto";
     audioRef.current = a;
     const onTime = () => {
-      if (engineRef.current !== "audio") return;
+      if (engineRef.current !== "audio" || recoveringRef.current) return;
+      goodPosRef.current = a.currentTime;
+      // Läuft wieder eine Weile ohne Fehler: Zähler für Wiederholungen zurücksetzen
+      if (retryCountRef.current && a.currentTime - lastRetryPosRef.current > 30) retryCountRef.current = 0;
       setPosition(a.currentTime);
       if (isFinite(a.duration)) setDuration(a.duration);
       const item = currentRef.current;
@@ -125,20 +136,87 @@ export default function PlayerProvider({ children }: { children: React.ReactNode
     };
     const onPlay = () => engineRef.current === "audio" && setPlaying(true);
     const onPause = () => {
-      if (engineRef.current !== "audio") return;
+      if (engineRef.current !== "audio" || recoveringRef.current) return;
       setPlaying(false);
       const item = currentRef.current;
       if (item) saveProgress(item, a.currentTime, a.duration || 0);
     };
     const onEnded = () => {
       // Kein automatisches Weiterspielen: Folge zu Ende = Stille
+      wantPlayRef.current = false;
       setPlaying(false);
       const item = currentRef.current;
       if (item) saveProgress(item, 0, a.duration || 0, true);
       log("info", "Folge zu Ende – Wiedergabe gestoppt");
     };
+    const waitOnline = () =>
+      new Promise<void>((resolve) => {
+        if (navigator.onLine) return resolve();
+        const done = () => {
+          window.removeEventListener("online", done);
+          window.clearTimeout(t);
+          resolve();
+        };
+        const t = window.setTimeout(done, 60000);
+        window.addEventListener("online", done);
+      });
+
+    // Folge an derselben Stelle neu laden (z. B. Verbindung kurz weg, Adresse des Podcast-Servers abgelaufen)
+    const recover = async (item: MediaItem, at: number, attempt: number) => {
+      await waitOnline();
+      if (currentRef.current?.id !== item.id || engineRef.current !== "audio" || !wantPlayRef.current) {
+        recoveringRef.current = false;
+        return;
+      }
+      try {
+        const { src } = await playableSrc(item.audioUrl!);
+        const resumeAt = Math.max(0, at - 2);
+        a.addEventListener(
+          "loadedmetadata",
+          () => {
+            a.currentTime = resumeAt;
+          },
+          { once: true },
+        );
+        a.src = src;
+        await a.play();
+        lastRetryPosRef.current = resumeAt;
+        recoveringRef.current = false;
+        setError(null);
+        log("ok", `Folge läuft wieder ab ${Math.round(resumeAt)} s (Versuch ${attempt})`);
+      } catch (e) {
+        // play() scheitert meist zusammen mit einem neuen error-Ereignis; das übernimmt den nächsten Versuch
+        log("error", `Neuer Versuch ${attempt}: ${(e as Error).message}`);
+        if (a.error == null) {
+          recoveringRef.current = false;
+          giveUp(item, at);
+        }
+      }
+    };
+
+    const giveUp = (item: MediaItem, at: number) => {
+      recoveringRef.current = false;
+      wantPlayRef.current = false;
+      setPlaying(false);
+      saveProgress(item, at, durationRef.current || 0);
+      setError("Diese Folge lässt sich gerade nicht abspielen.");
+    };
+
     const onError = () => {
-      if (engineRef.current === "audio") setError("Diese Folge lässt sich gerade nicht abspielen.");
+      if (engineRef.current !== "audio") return;
+      const item = currentRef.current;
+      const err = a.error;
+      const at = goodPosRef.current;
+      log("error", `Folge-Fehler ${err?.code ?? "?"}${err?.message ? ` (${err.message})` : ""} bei ${Math.round(at)} s`);
+      if (!item?.audioUrl) {
+        setError("Diese Folge lässt sich gerade nicht abspielen.");
+        return;
+      }
+      if (!wantPlayRef.current || retryCountRef.current >= 3) return giveUp(item, at);
+      retryCountRef.current += 1;
+      const attempt = retryCountRef.current;
+      recoveringRef.current = true;
+      window.setTimeout(() => recover(item, at, attempt), [500, 2000, 5000][attempt - 1] ?? 5000);
     };
     a.addEventListener("timeupdate", onTime);
     a.addEventListener("play", onPlay);
@@ -190,6 +268,7 @@ export default function PlayerProvider({ children }: { children: React.ReactNode
   }, []);
 
   const pauseAll = useCallback(() => {
+    wantPlayRef.current = false;
     audioRef.current?.pause();
     if (engineRef.current === "spotify") spotifyRef.current.sdk()?.pause();
   }, []);
@@ -197,6 +276,10 @@ export default function PlayerProvider({ children }: { children: React.ReactNode
   const play = useCallback(
     async (item: MediaItem, moreItems: MediaItem[] = []) => {
       setError(null);
+      retryCountRef.current = 0;
+      recoveringRef.current = false;
+      goodPosRef.current = 0;
+      wantPlayRef.current = item.kind === "episode";
       currentRef.current = item;
       setCurrent(item);
       setMore(moreItems.filter((m) => m.id !== item.id).slice(0, 12));
@@ -305,8 +388,17 @@ export default function PlayerProvider({ children }: { children: React.ReactNode
   const toggle = useCallback(() => {
     if (engineRef.current === "audio") {
       const a = audioRef.current!;
-      if (a.paused) a.play();
-      else a.pause();
+      const cur = currentRef.current;
+      if (a.error && cur) {
+        // Nach einem Fehler: Folge an der letzten Stelle neu starten
+        play(cur, moreRef.current);
+      } else if (a.paused) {
+        wantPlayRef.current = true;
+        a.play().catch((e) => log("error", `Weiterspielen: ${(e as Error).message}`));
+      } else {
+        wantPlayRef.current = false;
+        a.pause();
+      }
     } else if (engineRef.current === "spotify") {
       const p = spotifyRef.current.sdk();
       if (!p) return;
@@ -388,6 +480,11 @@ export default function PlayerProvider({ children }: { children: React.ReactNode
     navigator.mediaSession.setActionHandler("seekforward", () => seekBy(30));
   }, [current, toggle, seekBy]);
 
+  const retry = useCallback(() => {
+    const cur = currentRef.current;
+    if (cur) play(cur, moreRef.current);
+  }, [play]);
+
   const value = useMemo<PlayerCtx>(
     () => ({
       current,
@@ -414,8 +511,9 @@ export default function PlayerProvider({ children }: { children: React.ReactNode
       skipToStory,
       relaxAt,
       skipToRelax,
+      retry,
     }),
-    [current, more, playing, position, duration, expanded, open, close, play, toggle, seekBy, seekTo, sleep, setSleep, sleepEndsAt, spotifyHook.ready, spotifyHook.error, error, storyAt, skipToStory, relaxAt, skipToRelax, list, skipTrack],
+    [current, more, playing, position, duration, expanded, open, close, play, toggle, seekBy, seekTo, sleep, setSleep, sleepEndsAt, spotifyHook.ready, spotifyHook.error, error, storyAt, skipToStory, relaxAt, skipToRelax, list, skipTrack, retry],
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

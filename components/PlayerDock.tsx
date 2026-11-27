@@ -143,7 +143,14 @@ function FullPlayer() {
             </div>
           )}
 
-          {p.error && <div className="fp-error">{p.error}</div>}
+          {p.error && (
+            <div className="fp-error">
+              <p>{p.error}</p>
+              <button className="jump-btn retry" onClick={p.retry}>
+                Nochmal versuchen
+              </button>
+            </div>
+          )}
 
           <div className="fp-actions">
             <button

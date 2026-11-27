@@ -1433,6 +1433,12 @@ h3 {
   color: #1b1d33;
 }
 
+.jump-btn.retry {
+  background: #ffd43b;
+  color: #1b1d33;
+  margin-top: 10px;
+}
+
 .jump-btn.story {
   background: #ffffff;
   color: #1b1d33;
